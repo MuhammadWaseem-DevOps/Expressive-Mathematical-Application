@@ -1,219 +1,354 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from ttkthemes import ThemedTk
-import customtkinter as ctk
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from PIL import Image, ImageDraw, ImageFont
+from tkinter.scrolledtext import ScrolledText
+from PIL import ImageGrab
+import pdfkit
+from Services.symbolic_computer import SymbolicComputer
+import sympy as sp
 
-class SymbolicComputation(ctk.CTkFrame):
-    def __init__(self, parent, root):
-        super().__init__(parent, corner_radius=10, fg_color="#ecf0f1")
+class SymbolicComputation(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
         self.parent = parent
-        self.root = root
+        self.controller = controller
 
-        # Create history stacks for undo and redo
+        # Initialize the symbolic computation components
+        self.computer = SymbolicComputer()
         self.history = []
         self.future = []
 
-        # Main frame configuration
-        self.main_frame = ctk.CTkFrame(self, corner_radius=10, fg_color="#ffffff")
-        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        self.create_main_layout()
+        self.create_statusbar()
 
-        # Entry widget for input
-        self.entry = ctk.CTkTextbox(self.main_frame, height=5, font=("Helvetica", 16), fg_color="#ffffff")
-        self.entry.pack(fill=tk.BOTH, padx=10, pady=10)
-        self.entry.insert(tk.END, "Enter your symbolic equations here...")
+    def create_main_layout(self):
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Output Area
-        self.output_area = ctk.CTkLabel(self.main_frame, text="Results will be shown here...", font=("Helvetica", 14), text_color="#000000", fg_color="#ffffff", anchor="w", wraplength=600)
-        self.output_area.pack(fill=tk.BOTH, padx=10, pady=10)
+        top_frame = ttk.Frame(main_frame)
+        top_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
 
-        # Step-by-Step Output Area
-        self.step_output_area = ctk.CTkLabel(self.main_frame, text="Step-by-step solution will be shown here...", font=("Helvetica", 14), text_color="#000000", fg_color="#ffffff", anchor="w", wraplength=600)
-        self.step_output_area.pack(fill=tk.BOTH, padx=10, pady=10)
+        input_frame = ttk.Frame(top_frame)
+        input_frame.pack(side=tk.LEFT, padx=10)
 
-        # Create tabbed interface
-        self.create_tabs()
+        ttk.Label(input_frame, text="Enter a problem", font=("Helvetica", 14)).pack(anchor=tk.W)
 
-        # Control Buttons
-        self.create_control_buttons()
+        self.input_text = tk.Entry(input_frame, font=("Helvetica", 14), width=50)
+        self.input_text.pack(fill=tk.X, pady=(5, 5))
 
-        # Plot Area
-        self.plot_frame = ctk.CTkFrame(self.main_frame)
-        self.plot_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.plot_canvas = None
+        go_button = ttk.Button(input_frame, text="Go", command=self.solve, width=5)
+        go_button.pack(side=tk.RIGHT, pady=(5, 5), padx=(5, 0))
 
-    def create_tabs(self):
-        # Create a tab control
-        self.tab_control = ttk.Notebook(self.main_frame)
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(side=tk.TOP, fill=tk.X, pady=10)
+
+        simplify_button = ttk.Button(button_frame, text="Simplify", command=self.simplify)
+        simplify_button.pack(side=tk.LEFT, padx=5)
+
+        solve_button = ttk.Button(button_frame, text="Solve", command=self.solve)
+        solve_button.pack(side=tk.LEFT, padx=5)
+
+        inverse_button = ttk.Button(button_frame, text="Inverse", command=self.solve)
+        inverse_button.pack(side=tk.LEFT, padx=5)
+
+        tangent_button = ttk.Button(button_frame, text="Tangent", command=self.solve_tangent)
+        tangent_button.pack(side=tk.LEFT, padx=5)
+
+        line_button = ttk.Button(button_frame, text="Line", command=self.solve_line)
+        line_button.pack(side=tk.LEFT, padx=5)
+
+        dropdown = ttk.Combobox(button_frame, values=["See All", "Derivative", "Integral", "Limit", "ODE Solver", "PDE Solver"])
+        dropdown.current(0)
+        dropdown.bind("<<ComboboxSelected>>", self.handle_dropdown_selection)
+        dropdown.pack(side=tk.LEFT, padx=5)
+
+        result_frame = ttk.LabelFrame(main_frame, text="Result")
+        result_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        tab_control = ttk.Notebook(result_frame)
+        tab_control.pack(fill=tk.BOTH, expand=True)
+
+        self.result_tab = ScrolledText(tab_control, wrap=tk.WORD, state=tk.DISABLED)
+        tab_control.add(self.result_tab, text="Result")
+
+        self.step_tab = ScrolledText(tab_control, wrap=tk.WORD, state=tk.DISABLED)
+        tab_control.add(self.step_tab, text="Steps")
+
+    def create_statusbar(self):
+        self.statusbar = ttk.Label(self, text="Ready", relief=tk.SUNKEN, anchor=tk.W, padding="5")
+        self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def handle_dropdown_selection(self, event):
+        selected = event.widget.get()
+        if selected == "Derivative":
+            self.solve_derivative()
+        elif selected == "Integral":
+            self.solve_integral()
+        elif selected == "Limit":
+            self.solve_limit()
+        elif selected == "ODE Solver":
+            self.solve_ode()
+        elif selected == "PDE Solver":
+            self.solve_pde()
+
+    def solve(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                result, steps = self.computer.evaluate_expression(expression)
+                self.last_steps = steps  # Store steps for later display
+                self.display_result(f"Result: {result}")
+                self.statusbar.config(text="Calculation completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in calculation.")
+        self.update_history()
+
+    def solve_derivative(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                function, symbol = expression.split(',')
+                symbol = symbol.strip()
+                function = function.strip()
+
+                # Parse the function and symbol
+                sym = sp.Symbol(symbol)
+                expr = sp.sympify(function)
+
+                # Differentiate the function
+                derivative = sp.diff(expr, sym)
+                self.last_steps = self.construct_differentiation_steps(expr, derivative, sym)
+                
+                self.display_result(f"Derivative: {derivative}")
+                self.display_steps(self.last_steps)
+                self.statusbar.config(text="Derivative calculation completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in derivative calculation.")
+        self.update_history()
+
+    def construct_differentiation_steps(self, expr, derivative, symbol):
+        """
+        Constructs a detailed step-by-step explanation of the differentiation process.
+        """
+        steps = []
         
-        # Define tabs with updated names
-        tabs = {
-            "Simplification": self.show_simplification,
-            "Expansion": self.show_expansion,
-            "Factorization": self.show_factorization,
-            "Substitution": self.show_substitution,
-            "Differentiation": self.show_differentiation,
-            "Integration": self.show_integration,
-            "Solving Equations": self.show_solving_equations
-        }
+        # Step 1: Show the original expression
+        steps.append("Steps to Differentiate:\n")
+        steps.append("1. **Initial Expression**:\n")
+        steps.append(f"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
 
-        # Apply ttkthemes style to tabs
-        style = ttk.Style()
-        style.theme_use('arc')  # Applying the 'arc' theme from ttkthemes
-        style.configure('TNotebook', background='#ecf0f1')
-        style.configure('TNotebook.Tab', background='#bdc3c7', padding=[10, 5], font=('Helvetica', 12))
-        style.map('TNotebook.Tab', background=[('selected', '#3498db')])
+        # Step 2: Differentiate each term
+        steps.append("\n2. **Differentiate Each Term**:\n")
+        for term in expr.as_ordered_terms():
+            term_derivative = sp.diff(term, symbol)
+            steps.append(f"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
 
-        # Create tabs
-        for tab_name in tabs:
-            tab_frame = ttk.Frame(self.tab_control)
-            self.tab_control.add(tab_frame, text=tab_name)
-            tabs[tab_name](tab_frame)
+        # Step 3: Combine the Results
+        steps.append("\n3. **Combine the Results**:\n")
+        steps.append(f"   \( f'({symbol}) = {sp.pretty(derivative)} \)\n")
 
-        self.tab_control.pack(expand=1, fill="both")
+        # Step 4: Final Result
+        steps.append("\n4. **Final Result**:\n")
+        steps.append(f"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative)}**.\n")
 
-    def create_control_buttons(self):
-        # Create control buttons
-        self.control_buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="#ffffff")
-        self.control_buttons_frame.pack(fill=tk.X)
+        return "\n".join(steps)
 
-        buttons = {
-            "Execute": self.execute,
-            "Undo": self.undo,
-            "Redo": self.redo,
-            "Clear": self.clear_all,
-            "Save Solution": self.save_solution,
-            "Load": self.load
-        }
 
-        for text, command in buttons.items():
-            button = ctk.CTkButton(
-                self.control_buttons_frame,
-                text=text,
-                command=command,
-                height=40,
-                corner_radius=10,
-                fg_color="#3498db",
-                hover_color="#2980b9",
-                text_color="#ffffff"
-            )
-            button.pack(side=tk.LEFT, padx=5, pady=5)
 
-    def show_simplification(self, frame):
-        self.setup_interface(frame, "Simplify the expression:")
 
-    def show_expansion(self, frame):
-        self.setup_interface(frame, "Expand the expression:")
+    def solve_integral(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                function, symbol = expression.split(',')
+                result, steps = self.computer.integral(function.strip(), symbol.strip())
+                self.last_steps = steps
+                self.display_result(f"Integral: {result}")
+                self.statusbar.config(text="Integral calculation completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in integral calculation.")
+        self.update_history()
 
-    def show_factorization(self, frame):
-        self.setup_interface(frame, "Factorize the expression:")
+    def solve_limit(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                function, symbol, point = expression.split(',')
+                result, steps = self.computer.limit(function.strip(), symbol.strip(), float(point.strip()))
+                self.last_steps = steps
+                self.display_result(f"Limit: {result}")
+                self.statusbar.config(text="Limit calculation completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in limit calculation.")
+        self.update_history()
 
-    def show_substitution(self, frame):
-        self.setup_interface(frame, "Substitute in the expression:")
+    def solve_ode(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                equation, func = expression.split(',')
+                result, steps = self.computer.ode_solver(equation.strip(), func.strip())
+                self.last_steps = steps
+                self.display_result(f"ODE Solution: {result}")
+                self.statusbar.config(text="ODE solution completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in ODE solution.")
+        self.update_history()
 
-    def show_differentiation(self, frame):
-        self.setup_interface(frame, "Differentiate the expression:")
+    def solve_pde(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                equation, func = expression.split(',')
+                eq = sp.sympify(equation)
+                result, steps = self.computer.pde_solver(eq, func.strip())
+                self.last_steps = steps
+                self.display_result(f"PDE Solution: {result}")
+                self.statusbar.config(text="PDE solution completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in PDE solution.")
+        self.update_history()
 
-    def show_integration(self, frame):
-        self.setup_interface(frame, "Integrate the expression:")
+    def solve_tangent(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                function, symbol, point = expression.split(',')
+                result, steps = self.computer.tangent_line(function.strip(), symbol.strip(), float(point.strip()))
+                self.last_steps = steps
+                self.display_result(f"Tangent Line: {result}")
+                self.statusbar.config(text="Tangent line calculation completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in tangent line calculation.")
+        self.update_history()
 
-    def show_solving_equations(self, frame):
-        self.setup_interface(frame, "Solve the equations:")
+    def solve_line(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                # Logic for solving a line problem
+                self.display_result("Line feature not implemented yet.")
+                self.statusbar.config(text="Line feature not implemented yet.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in line calculation.")
+        self.update_history()
 
-    def setup_interface(self, frame, label_text):
-        for widget in frame.winfo_children():
-            widget.destroy()
-        
-        label = ctk.CTkLabel(frame, text=label_text, font=("Helvetica", 14))
-        label.pack(pady=10)
+    def simplify(self):
+        expression = self.input_text.get().strip()
+        if expression:
+            try:
+                result, steps = self.computer.evaluate_expression(expression)
+                simplified_result = sp.simplify(result)
+                self.display_result(f"Simplified Result: {simplified_result}")
+                self.display_steps(steps)
+                self.statusbar.config(text="Simplification completed successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                self.statusbar.config(text="Error in simplification.")
+        self.update_history()
 
-        step_button = ctk.CTkButton(
-            frame,
-            text="Show Step-by-Step",
-            command=self.show_step_by_step,
-            height=40,
-            corner_radius=10,
-            fg_color="#3498db",
-            hover_color="#2980b9",
-            text_color="#ffffff"
-        )
-        step_button.pack(pady=10)
-        # Add widgets like input field, output area, etc. here
+    def display_result(self, text):
+        self.result_tab.config(state=tk.NORMAL)
+        self.result_tab.delete("1.0", tk.END)
+        self.result_tab.insert(tk.END, text)
+        self.result_tab.config(state=tk.DISABLED)
 
-    def execute(self):
-        # Placeholder for execution logic
-        entered_text = self.entry.get("1.0", tk.END).strip()
-        self.output_area.configure(text=f"Executed: {entered_text}")
-
-    def show_step_by_step(self):
-        # Placeholder for step-by-step solution logic
-        entered_text = self.entry.get("1.0", tk.END).strip()
-        step_by_step_solution = f"Step-by-step for: {entered_text}\nStep 1: ...\nStep 2: ..."
-        self.step_output_area.configure(text=step_by_step_solution)
+    def display_steps(self):
+        if hasattr(self, 'last_steps') and self.last_steps:
+            steps = self.last_steps
+            self.step_tab.config(state=tk.NORMAL)
+            self.step_tab.delete("1.0", tk.END)
+            self.step_tab.insert(tk.END, steps)
+            self.step_tab.config(state=tk.DISABLED)
+        else:
+            messagebox.showinfo("Info", "No steps available. Please perform a calculation first.")
 
     def undo(self):
         if self.history:
-            self.future.append(self.entry.get("1.0", tk.END).strip())
-            self.entry.delete("1.0", tk.END)
-            self.entry.insert(tk.END, self.history.pop())
+            self.future.append(self.input_text.get().strip())
+            last_input = self.history.pop()
+            self.input_text.delete(0, tk.END)
+            self.input_text.insert(0, last_input)
+            self.statusbar.config(text="Undo performed.")
         else:
-            tk.messagebox.showinfo("Undo", "Nothing to undo")
+            self.statusbar.config(text="Nothing to undo.")
 
     def redo(self):
         if self.future:
-            self.history.append(self.entry.get("1.0", tk.END).strip())
-            self.entry.delete("1.0", tk.END)
-            self.entry.insert(tk.END, self.future.pop())
+            self.history.append(self.input_text.get().strip())
+            next_input = self.future.pop()
+            self.input_text.delete(0, tk.END)
+            self.input_text.insert(0, next_input)
+            self.statusbar.config(text="Redo performed.")
         else:
-            tk.messagebox.showinfo("Redo", "Nothing to redo")
-
-    def clear_all(self):
-        self.history.append(self.entry.get("1.0", tk.END).strip())
-        self.entry.delete("1.0", tk.END)
-        self.future.clear()
-        self.output_area.configure(text="Results will be shown here...")
-        self.step_output_area.configure(text="Step-by-step solution will be shown here...")
+            self.statusbar.config(text="Nothing to redo.")
 
     def save_solution(self):
-        step_by_step_solution = self.step_output_area.cget("text")
-        if not step_by_step_solution.strip():
-            messagebox.showwarning("Save Solution", "No step-by-step solution to save.")
-            return
-
-        file_types = [("PDF files", "*.pdf"), ("PNG files", "*.png"), ("All files", "*.*")]
+        file_types = [("PDF files", "*.pdf"), ("PNG files", "*.png"), ("Text files", "*.txt")]
         file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=file_types)
-
         if file_path:
-            if file_path.endswith('.pdf'):
-                self.save_as_pdf(file_path, step_by_step_solution)
-            elif file_path.endswith('.png'):
-                self.save_as_image(file_path, step_by_step_solution)
+            try:
+                if file_path.endswith('.pdf'):
+                    self.save_as_pdf(file_path)
+                elif file_path.endswith('.png'):
+                    self.save_as_image(file_path)
+                elif file_path.endswith('.txt'):
+                    self.save_as_text(file_path)
+            except Exception as e:
+                messagebox.showerror("Save Solution", f"Error saving solution: {e}")
 
-    def save_as_pdf(self, file_path, content):
+    def save_as_pdf(self, file_path):
         try:
-            c = canvas.Canvas(file_path, pagesize=letter)
-            width, height = letter
-            c.drawString(100, height - 100, "Step-by-Step Solution")
-            c.drawString(100, height - 120, content)
-            c.save()
-            messagebox.showinfo("Save Solution", f"Solution saved as PDF: {file_path}")
+            html = self.result_tab.get("1.0", tk.END)
+            pdfkit.from_string(html, file_path)
+            self.statusbar.config(text=f"Solution saved as PDF: {file_path}")
         except Exception as e:
             messagebox.showerror("Save Solution", f"Error saving as PDF: {e}")
 
-    def save_as_image(self, file_path, content):
+    def save_as_image(self, file_path):
         try:
-            img = Image.new('RGB', (800, 600), color = (255, 255, 255))
-            d = ImageDraw.Draw(img)
-            font = ImageFont.load_default()
-            d.text((10,10), content, fill=(0,0,0), font=font)
-            img.save(file_path)
-            messagebox.showinfo("Save Solution", f"Solution saved as image: {file_path}")
+            self.result_tab.update()
+            x = self.result_tab.winfo_rootx()
+            y = self.result_tab.winfo_rooty()
+            width = self.result_tab.winfo_width()
+            height = self.result_tab.winfo_height()
+            ImageGrab.grab().crop((x, y, x + width, y + height)).save(file_path)
+            self.statusbar.config(text=f"Solution saved as image: {file_path}")
         except Exception as e:
             messagebox.showerror("Save Solution", f"Error saving as image: {e}")
 
-    def load(self):
-        # Placeholder for load logic
-        tk.messagebox.showinfo("Load", "Loaded successfully!")
+    def save_as_text(self, file_path):
+        try:
+            with open(file_path, 'w') as file:
+                file.write("Symbolic Computation Result\n\n")
+                file.write(self.result_tab.get("1.0", tk.END))
+                file.write("\nStep-by-Step Solution:\n")
+                file.write(self.step_tab.get("1.0", tk.END))
+            self.statusbar.config(text=f"Solution saved as text: {file_path}")
+        except Exception as e:
+            messagebox.showerror("Save Solution", f"Error saving as text: {e}")
 
+    def load(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        if file_path:
+            try:
+                with open(file_path, "r") as file:
+                    content = file.read()
+                    self.input_text.delete(0, tk.END)
+                    self.input_text.insert(0, content)
+                self.statusbar.config(text=f"Loaded content from: {file_path}")
+            except Exception as e:
+                messagebox.showerror("Load", f"Error loading file: {e}")
+
+    def update_history(self):
+        current_input = self.input_text.get().strip()
+        if not self.history or self.history[-1] != current_input:
+            self.history.append(current_input)
+        self.future.clear()
