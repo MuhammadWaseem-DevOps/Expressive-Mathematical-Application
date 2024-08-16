@@ -11,8 +11,8 @@ from Gui.signup_screen import SignupScreen
 from Gui.symbolic_computation import SymbolicComputation
 from Gui.profile_management import ProfileManagement
 from Services.graph_plotter import GraphPlotter
-from Gui.graph_plotting import GraphPlotterFrame  # Import the GraphPlotterFrame class
-
+from Gui.graph_plotting import GraphPlotterFrame
+from Gui.expression_evaluator import ExpressionInputFrame
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -81,7 +81,7 @@ class TkinterGUI(ThemedTk):
         self.frames["Login Interface"] = LoginScreen(self.content_frame, self)
         self.frames["Signup Interface"] = SignupScreen(self.content_frame, self)
         self.frames["Dashboard"] = self.create_dashboard_frame()
-        self.frames["Expression Input"] = self.create_expression_input_frame()
+        self.frames["Expression Input"] = ExpressionInputFrame(self.content_frame, self)  # Use the new class
         self.frames["Graph Plotter"] = self.create_graph_plotter_frame()  # Use the updated method
         self.frames["Symbolic Computation"] = SymbolicComputation(self.content_frame, self)
         self.frames["Profile Management"] = ProfileManagement(self.content_frame, self)
@@ -99,22 +99,6 @@ class TkinterGUI(ThemedTk):
         # Add widgets to the dashboard frame
         dashboard_label = ttk.Label(frame, text="Dashboard", font=("Helvetica", 24, 'bold'), foreground="#2c3e50")
         dashboard_label.grid(row=0, column=0, padx=10, pady=10)
-
-        return frame
-
-    def create_expression_input_frame(self):
-        """Create the expression input frame."""
-        frame = ttk.Frame(self.content_frame, style='ExpressionInput.TFrame', padding=(20, 20))
-
-        ttk.Label(frame, text="Enter Expression:", font=("Helvetica", 14), foreground="#2c3e50").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.expression_entry = ttk.Entry(frame, font=("Helvetica", 14), width=50)
-        self.expression_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-
-        eval_button = ttk.Button(frame, text="Evaluate", command=self.evaluate_expression, style='Sidebar.TButton')
-        eval_button.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
-
-        self.expression_result_label = ttk.Label(frame, text="", font=("Helvetica", 14), foreground="#2c3e50")
-        self.expression_result_label.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         return frame
 
@@ -189,16 +173,15 @@ class TkinterGUI(ThemedTk):
         """Display the profile management frame."""
         self.showFrame("Profile Management")
 
+    def display_result(self, result_text, color):
+        """Display the result in the appropriate frame."""
+        # Implement this method as needed in your application
+        pass
+
     def evaluate_expression(self):
         """Evaluate the mathematical expression provided by the user."""
-        expression = self.expression_entry.get()
-        try:
-            result, steps = self.evaluator.evaluate(expression)
-            result_text = f"Result: {result}\n\nSteps:\n{steps}"
-            self.expression_result_label.config(text=result_text, foreground=self.success_color)
-        except Exception as e:
-            logging.error(f"Error evaluating expression: {e}")
-            self.display_error_popup(f"Error evaluating expression: {e}")
+        # This method is now handled within the ExpressionInputFrame class
+        pass
 
     def login(self):
         """Handle the login process."""

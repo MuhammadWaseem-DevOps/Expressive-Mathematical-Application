@@ -97,6 +97,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.evaluate_expression(expression)
                 self.last_steps = steps  # Store steps for later display
                 self.display_result(f"Result: {result}")
+                self.display_steps()
                 self.statusbar.config(text="Calculation completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -108,54 +109,15 @@ class SymbolicComputation(ttk.Frame):
         if expression:
             try:
                 function, symbol = expression.split(',')
-                symbol = symbol.strip()
-                function = function.strip()
-
-                # Parse the function and symbol
-                sym = sp.Symbol(symbol)
-                expr = sp.sympify(function)
-
-                # Differentiate the function
-                derivative = sp.diff(expr, sym)
-                self.last_steps = self.construct_differentiation_steps(expr, derivative, sym)
-                
-                self.display_result(f"Derivative: {derivative}")
-                self.display_steps(self.last_steps)
+                result, steps = self.computer.derivative(function.strip(), symbol.strip())
+                self.last_steps = steps
+                self.display_result(f"Derivative: {result}")
+                self.display_steps()
                 self.statusbar.config(text="Derivative calculation completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in derivative calculation.")
         self.update_history()
-
-    def construct_differentiation_steps(self, expr, derivative, symbol):
-        """
-        Constructs a detailed step-by-step explanation of the differentiation process.
-        """
-        steps = []
-        
-        # Step 1: Show the original expression
-        steps.append("Steps to Differentiate:\n")
-        steps.append("1. **Initial Expression**:\n")
-        steps.append(f"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
-
-        # Step 2: Differentiate each term
-        steps.append("\n2. **Differentiate Each Term**:\n")
-        for term in expr.as_ordered_terms():
-            term_derivative = sp.diff(term, symbol)
-            steps.append(f"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
-
-        # Step 3: Combine the Results
-        steps.append("\n3. **Combine the Results**:\n")
-        steps.append(f"   \( f'({symbol}) = {sp.pretty(derivative)} \)\n")
-
-        # Step 4: Final Result
-        steps.append("\n4. **Final Result**:\n")
-        steps.append(f"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative)}**.\n")
-
-        return "\n".join(steps)
-
-
-
 
     def solve_integral(self):
         expression = self.input_text.get().strip()
@@ -165,6 +127,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.integral(function.strip(), symbol.strip())
                 self.last_steps = steps
                 self.display_result(f"Integral: {result}")
+                self.display_steps()
                 self.statusbar.config(text="Integral calculation completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -179,6 +142,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.limit(function.strip(), symbol.strip(), float(point.strip()))
                 self.last_steps = steps
                 self.display_result(f"Limit: {result}")
+                self.display_steps()
                 self.statusbar.config(text="Limit calculation completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -193,6 +157,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.ode_solver(equation.strip(), func.strip())
                 self.last_steps = steps
                 self.display_result(f"ODE Solution: {result}")
+                self.display_steps()
                 self.statusbar.config(text="ODE solution completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -208,6 +173,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.pde_solver(eq, func.strip())
                 self.last_steps = steps
                 self.display_result(f"PDE Solution: {result}")
+                self.display_steps()
                 self.statusbar.config(text="PDE solution completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -222,6 +188,7 @@ class SymbolicComputation(ttk.Frame):
                 result, steps = self.computer.tangent_line(function.strip(), symbol.strip(), float(point.strip()))
                 self.last_steps = steps
                 self.display_result(f"Tangent Line: {result}")
+                self.display_steps()
                 self.statusbar.config(text="Tangent line calculation completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
@@ -232,7 +199,6 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                # Logic for solving a line problem
                 self.display_result("Line feature not implemented yet.")
                 self.statusbar.config(text="Line feature not implemented yet.")
             except Exception as e:
@@ -246,8 +212,9 @@ class SymbolicComputation(ttk.Frame):
             try:
                 result, steps = self.computer.evaluate_expression(expression)
                 simplified_result = sp.simplify(result)
+                self.last_steps = steps
                 self.display_result(f"Simplified Result: {simplified_result}")
-                self.display_steps(steps)
+                self.display_steps()
                 self.statusbar.config(text="Simplification completed successfully.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))

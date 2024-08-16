@@ -2,18 +2,17 @@ import re
 import sympy as sp
 from typing import List, Any
 
-# Define your tokens here
 class Token:
     def __init__(self, value):
         self.value = value
 
 class Number(Token):
     def __init__(self, value):
-        value_str = str(value)  # Convert value to string first
+        value_str = str(value)
         if '.' in value_str:
-            super().__init__(float(value_str))  # Convert to float if it contains a decimal
+            super().__init__(float(value_str))
         else:
-            super().__init__(int(value_str))  # Retain as integer if no decimal
+            super().__init__(int(value_str))
 
 class Constant(Token):
     pass
@@ -54,7 +53,7 @@ class SymbolicComputer:
         }
 
         self.priority = {'+': 1, '-': 1, '*': 2, '/': 2, 'mod': 2, '^': 3, '**': 3}
-        self.right_associative = {'^', '**'}  # Set of right-associative operators
+        self.right_associative = {'^', '**'}
         self.functions = {
             'sqrt': sp.sqrt, 'cbrt': lambda x: x**(1/3), 'sin': sp.sin, 'cos': sp.cos, 'tan': sp.tan,
             'asin': sp.asin, 'acos': sp.acos, 'atan': sp.atan, 'log': sp.log, 'exp': sp.exp, 
@@ -112,7 +111,6 @@ class SymbolicComputer:
         self.add_step(f"Tokens: {[token.value for token in tokens]}")
         return tokens
 
-
     def to_postfix(self, tokens: List[Token]) -> List[Token]:
         output = []
         operators = []
@@ -122,9 +120,9 @@ class SymbolicComputer:
                 output.append(token)
             elif isinstance(token, Operator):
                 while (operators and isinstance(operators[-1], Operator) and
-                       (self.priority.get(token.value, 0) < self.priority.get(operators[-1].value, 0) or
+                    (self.priority.get(token.value, 0) < self.priority.get(operators[-1].value, 0) or
                         (self.priority.get(token.value, 0) == self.priority.get(operators[-1].value, 0) and
-                         token.value not in self.right_associative))):
+                        token.value not in self.right_associative))):
                     output.append(operators.pop())
                 operators.append(token)
             elif isinstance(token, Function):
@@ -135,7 +133,7 @@ class SymbolicComputer:
                 elif token.value == ')':
                     while operators and not isinstance(operators[-1], Parenthesis):
                         output.append(operators.pop())
-                    operators.pop()  # Remove the '('
+                    operators.pop()  # Pop the '('
 
         while operators:
             output.append(operators.pop())
@@ -158,7 +156,6 @@ class SymbolicComputer:
             elif isinstance(token, Function):
                 if len(stack) < 1:
                     raise ValueError(f"Not enough operands in stack for function {token.value}")
-                # If the function has multiple arguments, they should be combined as a single tree node
                 arg = stack.pop()
                 stack.append(Node(token, right=arg))
             else:
@@ -169,7 +166,6 @@ class SymbolicComputer:
 
         self.add_step(f"Expression tree: {stack[0]}")
         return stack[0]
-
 
     def evaluate_expression(self, expression: str):
         self.clear_steps()
@@ -254,9 +250,30 @@ class SymbolicComputer:
         self.clear_steps()
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
-        derivative = sp.diff(expr, sym)
-        self.add_step(f"Taking derivative of {function} with respect to {symbol}: {derivative}")
-        return derivative, self.get_steps()
+
+        # Step 1: Show the original expression
+        self.add_step("Steps to Differentiate:\n")
+        self.add_step("1. **Initial Expression**:\n")
+        self.add_step(f"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
+
+        # Step 2: Differentiate each term
+        self.add_step("\n2. **Differentiate Each Term**:\n")
+        derivatives = []
+        for term in expr.as_ordered_terms():
+            term_derivative = sp.diff(term, sym)
+            derivatives.append(term_derivative)
+            self.add_step(f"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
+
+        # Combine the results
+        derivative_expr = sum(derivatives)
+        self.add_step("\n3. **Combine the Results**:\n")
+        self.add_step(f"   \( f'({symbol}) = {sp.pretty(derivative_expr)} \)\n")
+
+        # Final Result
+        self.add_step("\n4. **Final Result**:\n")
+        self.add_step(f"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative_expr)}**.\n")
+
+        return derivative_expr, self.get_steps()
 
     def integral(self, function: str, symbol: str):
         self.clear_steps()
@@ -348,44 +365,63 @@ class SymbolicComputer:
         self.clear_steps()
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
+        
+        # Step 1: Differentiate the function to find the slope
         slope = sp.diff(expr, sym).subs(sym, point)
+        self.add_step(f"Step 1: Differentiate the function to find the slope.\n"
+                      f"   - The derivative of {sp.pretty(expr)} with respect to {symbol} is {sp.pretty(sp.diff(expr, sym))}.\n"
+                      f"   - Evaluating this derivative at {symbol} = {point} gives the slope {sp.pretty(slope)}.\n")
+        
+        # Step 2: Compute the y-intercept
         y_intercept = expr.subs(sym, point) - slope * point
+        self.add_step(f"Step 2: Compute the y-intercept.\n"
+                      f"   - Substituting {symbol} = {point} into the original function gives {sp.pretty(expr.subs(sym, point))}.\n"
+                      f"   - The equation of the tangent line is y = {slope}*{symbol} + b.\n"
+                      f"   - Solving for the y-intercept b gives b = {sp.pretty(y_intercept)}.\n")
+        
+        # Step 3: Form the equation of the tangent line
         tangent = slope * sym + y_intercept
-        self.add_step(f"Computing tangent line to {function} at {symbol}={point}.")
-        self.add_step(f"Slope: {slope}")
-        self.add_step(f"y-intercept: {y_intercept}")
-        self.add_step(f"Tangent line equation: y = {tangent}")
+        self.add_step(f"Step 3: Form the equation of the tangent line.\n"
+                      f"   - Therefore, the equation of the tangent line is y = {sp.pretty(tangent)}.\n")
+        
+        self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
+        
         return tangent, self.get_steps()
-
     def solve_exact_diff_eq(self, P, Q, x, y):
         self.clear_steps()
+        
+        # Compute partial derivatives
         dP_dy = sp.diff(P, y)
         dQ_dx = sp.diff(Q, x)
-
-        self.add_step(f"Computing partial derivatives ∂P/∂y = {dP_dy} and ∂Q/∂x = {dQ_dx}.")
+        self.add_step(f"Computing partial derivatives: ∂P/∂y = {dP_dy}, ∂Q/∂x = {dQ_dx}.")
+        
+        # Check if the equation is exact
         is_exact = sp.simplify(dP_dy - dQ_dx) == 0
         
         if is_exact:
             self.add_step("This is an exact differential equation.")
             
+            # Integrate P with respect to x
             f_xy = sp.integrate(P, x) + sp.Function('h')(y)
-            self.add_step(f"Integrating P with respect to x: ∫P dx = {sp.integrate(P, x)} + h(y)")
+            self.add_step(f"Integrating P with respect to x: ∫P dx = {sp.integrate(P, x)} + h(y).")
             
+            # Differentiate and set equal to Q
             f_xy_y = sp.diff(f_xy, y)
             eq = sp.Eq(f_xy_y, Q)
-            self.add_step(f"Taking derivative with respect to y and setting equal to Q: {f_xy_y} = {Q}")
-
+            self.add_step(f"Taking derivative with respect to y and setting equal to Q: {f_xy_y} = {Q}.")
+            
+            # Solve for h(y)
             h_y = sp.dsolve(eq, sp.Function('h')(y)).rhs
-            self.add_step(f"Solving for h(y): h(y) = {h_y}")
-
+            self.add_step(f"Solving for h(y): h(y) = {h_y}.")
+            
+            # Substitute h(y) back into the equation
             f_xy = f_xy.subs(sp.Function('h')(y), h_y)
-            self.add_step(f"Final solution: f(x, y) = {f_xy}")
-
+            self.add_step(f"Final solution: f(x, y) = {f_xy}.")
+            
             return f_xy, self.get_steps()
         else:
             self.add_step("This is not an exact differential equation.")
             return None, self.get_steps()
-
     def practice_problems(self, topic: str):
         problems = {
             'algebra': ["x^2 - 4 = 0", "2*x + 3 = 7"],
@@ -399,16 +435,19 @@ class SymbolicComputer:
     def solve_practice_problem(self, problem: str):
         if '=' in problem:
             symbol = re.findall(r'\b[a-zA-Z]\b', problem)[0]
-            return self.solve_equation(problem, symbol)
+            result, steps = self.solve_equation(problem, symbol)
         elif 'diff' in problem:
             function = problem.split('(')[1].split(',')[0]
             symbol = problem.split(',')[1].strip(')')
-            return self.derivative(function, symbol)
+            result, steps = self.derivative(function, symbol)
         elif 'integrate' in problem:
             function = problem.split('(')[1].split(',')[0]
             symbol = problem.split(',')[1].strip(')')
-            return self.integral(function, symbol)
+            result, steps = self.integral(function, symbol)
         elif '[' in problem:
-            return self.matrix_operations(problem)
+            result = self.matrix_operations(problem)
+            steps = result['steps']
         else:
-            return self.evaluate_expression(problem)
+            result, steps = self.evaluate_expression(problem)
+
+        return result, steps
