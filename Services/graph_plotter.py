@@ -56,7 +56,7 @@ class GraphPlotter(IGraphPlotter):
             'x_min': x_min,
             'x_max': x_max,
         }
-
+        
         # Save the plot image as a PNG file in memory
         buffer = io.BytesIO()
         self.figure.savefig(buffer, format='png')
@@ -65,22 +65,23 @@ class GraphPlotter(IGraphPlotter):
 
         # Save graph data in GRAPHICAL_FUNCTION table
         graph_entry = {
-            'user_id': self.user_id,
+            'user_id': self.user_id,  # Ensure user_id is included
             'function': function,
             'x_min': x_min,
             'x_max': x_max,
-            'timestamp': datetime.datetime.now().isoformat(),
+            'timestamp': datetime.datetime.now().isoformat(),  # Use current timestamp
             'image': image_data
         }
+        print(f"Inserting into GRAPHICAL_FUNCTION: {graph_entry}")
         graph_data_id = self.dao.insert('GRAPHICAL_FUNCTION', graph_entry)
 
         # Link to computation history
         history_entry = {
-            'user_id': self.user_id,
+            'user_id': self.user_id,  # Ensure user_id is included
             'expression': function,
             'result': 'Graph plotted',
             'computation_type': 'Graphical Function',
-            'timestamp': datetime.datetime.now().isoformat(),
+            'timestamp': datetime.datetime.now().isoformat(),  # Ensure the timestamp is populated
             'symbolic_steps': json.dumps(plot_settings),
             'graph_data_id': graph_data_id
         }

@@ -1,6 +1,8 @@
 import math
 import re
 from collections import deque
+import json
+import datetime
 
 class ExpressionEvaluator:
     def __init__(self, dao, user_id):
@@ -175,7 +177,8 @@ class ExpressionEvaluator:
                 'expression': expression,
                 'result': str(result),
                 'computation_type': 'Expression Evaluation',
-                'symbolic_steps': steps
+                'timestamp': datetime.datetime.now().isoformat(),  # Add the timestamp here
+                'symbolic_steps': json.dumps(steps)  # Convert steps to JSON format
             }
             self.dao.insert('COMPUTATION_HISTORY', entry)
             self._history_saved = True  # Mark as saved to prevent duplicates
