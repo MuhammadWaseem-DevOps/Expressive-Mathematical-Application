@@ -4,7 +4,7 @@ from Services.expression_evaluator import ExpressionEvaluator
 from Services.graph_plotter import GraphPlotter
 from Services.symbolic_computer import SymbolicComputer
 from Services.profile_manager import ProfileManager
-from Services.dao import IDataAccessObject
+from DbSetup.dao import IDataAccessObject
 from Services.error_handler import IErrorHandler
 from Services.computation_history import ComputationHistory
 from Services.data_exporter import DataExporter

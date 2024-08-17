@@ -27,7 +27,7 @@ class SignupScreen(ctk.CTkFrame):
         right_frame = ctk.CTkFrame(self, corner_radius=10, fg_color="#FFFFFF")
         right_frame.place(relx=0.5, rely=0.1, relwidth=0.4, relheight=0.8)
 
-        logo = ctk.CTkLabel(right_frame, text="MathApp", font=("Helvetica", 22, "bold"), anchor="center")
+        logo = ctk.CTkLabel(right_frame, text="Expressive Mathematical App", font=("Helvetica", 22, "bold"), anchor="center")
         logo.pack(pady=(20, 10))
 
         welcome_label = ctk.CTkLabel(right_frame, text="Create your account", font=("Helvetica", 18))

@@ -14,6 +14,8 @@ from Services.graph_plotter import GraphPlotter
 from Gui.graph_plotting import GraphPlotterFrame
 from Gui.expression_evaluator import ExpressionInputFrame
 from Services.authentication import AuthenticationService
+from Services.computation_history import ComputationHistory
+from DbSetup.dao import SQLiteDataAccessObject
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,20 +23,21 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 class TkinterGUI(ThemedTk):
     def __init__(self, auth_service=None, expression_evaluator=None,
                  symbolic_computer=None, profile_manager=None, error_handler=None,
-                 computation_history=None, data_exporter=None, db_path='my_project_database.db'):
+                 computation_history=None, data_exporter=None, db_path='my_project_database.db', dao=None):
         super().__init__()
         self.title("Expressive Mathematical Application")
         self.geometry("1200x800")
         self.set_theme("arc")
 
-        # Initialize the services
+        # Initialize the DAO and services
+        self.dao = dao or SQLiteDataAccessObject(db_name=db_path)
         self.auth_service = auth_service or AuthenticationService(db_path)
-        self.evaluator = expression_evaluator
-        self.symbolic_computer = symbolic_computer
-        self.profile_manager = profile_manager
-        self.error_handler = error_handler
-        self.computation_history = computation_history
-        self.data_exporter = data_exporter
+        self.evaluator = None  # Initialize later after login
+        self.symbolic_computer = symbolic_computer or SymbolicComputation(self.dao)
+        self.profile_manager = profile_manager or ProfileManagement(self.dao)
+        self.error_handler = error_handler or ErrorHandler(self.dao)
+        self.computation_history = None  # Initialize later after login
+        self.data_exporter = data_exporter or DataExporter(self.dao)
         self.db_path = db_path
 
         # Custom color theme
@@ -76,7 +79,23 @@ class TkinterGUI(ThemedTk):
         if self.auth_service.current_user_id is None:
             self.showLoginScreen()
         else:
-            self.showDashboard()
+            self.initialize_after_login()
+
+    def initialize_after_login(self):
+        """Initialize components after user login."""
+        user_id = self.auth_service.current_user_id
+        if not user_id:
+            raise ValueError("User ID is not set after login. Cannot initialize services requiring user ID.")
+
+        # Initialize the ExpressionEvaluator with the DAO and user_id
+        self.evaluator = ExpressionEvaluator(dao=self.dao, user_id=user_id)
+        
+        # Initialize the ComputationHistory with the DAO and user_id
+        self.computation_history = ComputationHistory(dao=self.dao, user_id=user_id)
+
+        # Initialize sidebar and show the dashboard
+        self.init_sidebar()
+        self.showDashboard()
 
     def toggle_sidebar(self):
         """Toggle the visibility of the sidebar."""
@@ -95,8 +114,8 @@ class TkinterGUI(ThemedTk):
         self.frames["Expression Input"] = ExpressionInputFrame(self.content_frame, self)
         self.frames["Graph Plotter"] = self.create_graph_plotter_frame()
         self.frames["Symbolic Computation"] = SymbolicComputation(self.content_frame, self)
-        # Do not initialize Profile Management here; do it only when the user is logged in
-
+        # Profile Management will be initialized after login
+        
         for frame in self.frames.values():
             frame.grid(row=0, column=0, sticky="nsew")
 
@@ -106,11 +125,8 @@ class TkinterGUI(ThemedTk):
     def create_dashboard_frame(self):
         """Create the dashboard frame."""
         frame = ttk.Frame(self.content_frame, style='Dashboard.TFrame', padding=(20, 20))
-
-        # Add widgets to the dashboard frame
         dashboard_label = ttk.Label(frame, text="Dashboard", font=("Helvetica", 24, 'bold'), foreground="#2c3e50")
         dashboard_label.grid(row=0, column=0, padx=10, pady=10)
-
         return frame
 
     def create_graph_plotter_frame(self):
@@ -207,8 +223,7 @@ class TkinterGUI(ThemedTk):
     def login(self, username, password):
         logging.debug("Attempting login")
         if self.auth_service.authenticate_user(username, password):
-            self.sidebar.grid()  # Show the sidebar
-            self.showDashboard()  # Show the dashboard after login
+            self.initialize_after_login()  # Initialize components after login
             self.frames["Login Interface"].login_button.configure(text="Logout", command=self.logout)
         else:
             self.display_error_popup("Invalid username or password. Please try again.")

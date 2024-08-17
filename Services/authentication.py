@@ -1,8 +1,8 @@
 import hashlib
 import re
 from tkinter import messagebox
-from Services.dao import SQLiteDataAccessObject
-import logging  # Add this import
+from DbSetup.dao import SQLiteDataAccessObject
+import logging
 
 class AuthenticationService:
     def __init__(self, db):
@@ -87,3 +87,7 @@ class AuthenticationService:
     def logout(self):
         """Clear the current user ID on logout."""
         self.current_user_id = None
+
+    def get_current_user_id(self):
+        """Returns the ID of the currently logged-in user."""
+        return self.current_user_id

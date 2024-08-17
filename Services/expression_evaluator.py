@@ -3,7 +3,7 @@ import re
 from collections import deque
 
 class ExpressionEvaluator:
-    def __init__(self):
+    def __init__(self, dao, user_id):
         self.variables = {}
         self.functions = {
             'abs': abs,
@@ -23,12 +23,23 @@ class ExpressionEvaluator:
             'Matrix': Matrix,
         }
         self.solver = StepByStepSolver()
+        self.dao = dao  # Data Access Object for database operations
+        self.user_id = user_id  # Current user ID for saving history
+        self._history_saved = False  # Flag to track if history is saved
 
     def evaluate(self, expression: str):
+        # Reset the history saved flag before each evaluation
+        self._history_saved = False
+
+        # Parse and evaluate
         parser = self.Parser(expression)
         ast = parser.parse()
         result = self._evaluate_ast(ast)
         steps = self.solver.get_steps()
+
+        # Save the result and steps to the computation history
+        self.save_to_history(expression, result, steps)
+
         return result, steps
 
     def _evaluate_ast(self, node):
@@ -155,6 +166,19 @@ class ExpressionEvaluator:
             return result
         except Exception as e:
             raise ValueError(f"Failed to apply operator: {str(e)}")
+
+    def save_to_history(self, expression, result, steps):
+        """Save the evaluation result and steps to the computation history."""
+        if not self._history_saved:
+            entry = {
+                'user_id': self.user_id,
+                'expression': expression,
+                'result': str(result),
+                'computation_type': 'Expression Evaluation',
+                'symbolic_steps': steps
+            }
+            self.dao.insert('COMPUTATION_HISTORY', entry)
+            self._history_saved = True  # Mark as saved to prevent duplicates
 
     class Parser:
         def __init__(self, expression):
@@ -407,17 +431,6 @@ class Vector:
         )
 
 
-# Step-by-Step Solver to track each step of the evaluation process
-class StepByStepSolver:
-    def __init__(self):
-        self.steps = []
-
-    def log_step(self, description, result):
-        self.steps.append(f"{description}: {result}")
-
-    def get_steps(self):
-        return "\n".join(self.steps)
-
 # Rational Expression handling
 class RationalExpression:
     def __init__(self, numerator, denominator):
@@ -464,7 +477,6 @@ class RationalExpression:
             new_numerator.coefficients, new_denominator.coefficients
         ).simplify()
 
-
 # Inequality Expression handling
 class InequalityExpression:
     def __init__(self, left_expr, operator, right_expr):
@@ -503,4 +515,3 @@ class PiecewiseExpression:
             if eval(condition.replace("x", str(x))):
                 return eval(expr.replace("x", str(x)))
         return None
-

@@ -62,10 +62,10 @@ class SymbolicComputer:
         self.constants = {'π': sp.pi, 'e': sp.E}
         self.steps = []
 
-    def add_step(self, step):
+    def add_step(self, step: str):
         self.steps.append(step)
 
-    def get_steps(self):
+    def get_steps(self) -> str:
         return "\n".join(self.steps)
 
     def clear_steps(self):
@@ -178,7 +178,7 @@ class SymbolicComputer:
         self.add_step(f"Final result: {result}")
         return result, self.get_steps()
 
-    def evaluate_node(self, node):
+    def evaluate_node(self, node: Node):
         if node is None:
             raise ValueError("Node is None during evaluation.")
         
@@ -212,9 +212,9 @@ class SymbolicComputer:
         return None
     
     def handle_function(self, func_name: str, arg: Any) -> Any:
-        x = sp.Symbol('x')
         try:
             if func_name in self.functions:
+                # Add steps for specific functions
                 if func_name == 'integrate':
                     self.add_step(f"Starting integration of: ∫({arg}) dx")
                 elif func_name == 'diff':
@@ -253,25 +253,25 @@ class SymbolicComputer:
 
         # Step 1: Show the original expression
         self.add_step("Steps to Differentiate:\n")
-        self.add_step("1. **Initial Expression**:\n")
-        self.add_step(f"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
+        self.add_step(r"1. **Initial Expression**:\n")
+        self.add_step(rf"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
 
         # Step 2: Differentiate each term
-        self.add_step("\n2. **Differentiate Each Term**:\n")
+        self.add_step(r"\n2. **Differentiate Each Term**:\n")
         derivatives = []
         for term in expr.as_ordered_terms():
             term_derivative = sp.diff(term, sym)
             derivatives.append(term_derivative)
-            self.add_step(f"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
+            self.add_step(rf"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
 
         # Combine the results
         derivative_expr = sum(derivatives)
-        self.add_step("\n3. **Combine the Results**:\n")
-        self.add_step(f"   \( f'({symbol}) = {sp.pretty(derivative_expr)} \)\n")
+        self.add_step(r"\n3. **Combine the Results**:\n")
+        self.add_step(rf"   \( f'({symbol}) = {sp.pretty(derivative_expr)} \)\n")
 
         # Final Result
-        self.add_step("\n4. **Final Result**:\n")
-        self.add_step(f"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative_expr)}**.\n")
+        self.add_step(r"\n4. **Final Result**:\n")
+        self.add_step(rf"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative_expr)}**.\n")
 
         return derivative_expr, self.get_steps()
 
@@ -387,6 +387,7 @@ class SymbolicComputer:
         self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
         
         return tangent, self.get_steps()
+
     def solve_exact_diff_eq(self, P, Q, x, y):
         self.clear_steps()
         
@@ -422,6 +423,7 @@ class SymbolicComputer:
         else:
             self.add_step("This is not an exact differential equation.")
             return None, self.get_steps()
+
     def practice_problems(self, topic: str):
         problems = {
             'algebra': ["x^2 - 4 = 0", "2*x + 3 = 7"],

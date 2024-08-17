@@ -51,10 +51,20 @@ class ExpressionInputFrame(ttk.Frame):
         """Evaluate the mathematical expression provided by the user and display the result."""
         expression = self.expression_entry.get()
         try:
+            # Log start of evaluation
+            print("Starting evaluation of expression:", expression)
+
             # Assuming controller has an evaluator instance
             result, steps = self.controller.evaluator.evaluate(expression)
             result_text = f"Result: {result}\n\nSteps:\n{steps}"
             self.display_result(result_text)
+
+            # Save the result to the computation history
+            self.save_to_history(expression, result, steps)
+
+            # Log end of evaluation
+            print("Completed evaluation and saved to history.")
+
         except Exception as e:
             self.display_error_popup(f"Error evaluating expression: {e}")
 
@@ -65,9 +75,17 @@ class ExpressionInputFrame(ttk.Frame):
         self.output_text.insert(tk.END, result_text)
         self.output_text.config(state='disabled')
 
+    def save_to_history(self, expression, result, steps):
+        """Save the evaluation result and steps to the computation history."""
+        # The actual saving to history is managed by the ExpressionEvaluator, so no need to check the flag here.
+        self.controller.evaluator.save_to_history(expression, result, steps)
+
     def display_error_popup(self, message):
         """Display an error message in a popup dialog."""
         messagebox.showerror("Error", message)
+
+    # The save_output, export_as_pdf, and export_as_image methods remain unchanged...
+
 
     def save_output(self):
         """Save the current output to a file."""

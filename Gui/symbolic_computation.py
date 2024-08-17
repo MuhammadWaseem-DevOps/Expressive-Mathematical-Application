@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import logging
+import datetime
+
 from tkinter.scrolledtext import ScrolledText
 from PIL import ImageGrab
 import pdfkit
@@ -99,6 +102,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Result: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Calculation completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "evaluation")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in calculation.")
@@ -114,6 +118,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Derivative: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Derivative calculation completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "derivative")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in derivative calculation.")
@@ -129,6 +134,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Integral: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Integral calculation completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "integral")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in integral calculation.")
@@ -144,6 +150,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Limit: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Limit calculation completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "limit")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in limit calculation.")
@@ -159,6 +166,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"ODE Solution: {result}")
                 self.display_steps()
                 self.statusbar.config(text="ODE solution completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "ode_solver")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in ODE solution.")
@@ -175,6 +183,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"PDE Solution: {result}")
                 self.display_steps()
                 self.statusbar.config(text="PDE solution completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "pde_solver")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in PDE solution.")
@@ -190,6 +199,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Tangent Line: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Tangent line calculation completed successfully.")
+                self.save_computation_to_db(expression, result, steps, "tangent_line")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in tangent line calculation.")
@@ -216,10 +226,29 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Simplified Result: {simplified_result}")
                 self.display_steps()
                 self.statusbar.config(text="Simplification completed successfully.")
+                self.save_computation_to_db(expression, simplified_result, steps, "simplification")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in simplification.")
         self.update_history()
+
+    def save_computation_to_db(self, expression, result, steps, computation_type):
+        user_id = self.controller.auth_service.current_user_id
+        if user_id:
+            logging.debug(f"Saving computation with: expression={expression}, result={result}, steps={steps}, computation_type={computation_type}")
+            entry = {
+                'user_id': user_id,
+                'expression': expression,
+                'result': str(result),  # Ensure result is a string
+                'computation_type': computation_type,
+                'symbolic_steps': str(steps),  # Convert steps to string
+                'timestamp': datetime.datetime.now().isoformat()  # Format timestamp
+            }
+            logging.debug(f"Formatted entry: {entry}")
+            self.controller.computation_history.add_entry(entry)
+            messagebox.showinfo("Success", "Computation saved successfully!")
+        else:
+            messagebox.showerror("Error", "User not logged in. Cannot save computation.")
 
     def display_result(self, text):
         self.result_tab.config(state=tk.NORMAL)

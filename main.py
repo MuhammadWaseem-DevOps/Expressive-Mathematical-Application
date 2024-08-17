@@ -10,12 +10,11 @@ from Services.expression_evaluator import ExpressionEvaluator
 from Services.graph_plotter import GraphPlotter
 from Services.symbolic_computer import SymbolicComputer
 from Services.profile_manager import ProfileManager
-from Services.dao import SQLiteDataAccessObject
 from Services.error_handler import ErrorHandler
 from Services.computation_history import ComputationHistory
 from Services.data_exporter import DataExporter
 from Gui.userview import TkinterGUI
-from Services.dao import SQLiteDataAccessObject
+from DbSetup.dao import SQLiteDataAccessObject
 import tkinter as tk
 import sympy as sp
 import re
@@ -209,26 +208,25 @@ if __name__ == "__main__":
     # Initialize the SQLiteDataAccessObject with a valid db_name
     dao = SQLiteDataAccessObject(db_name=db_path)
 
-    # Initialize the services
+    # Initialize the services that don't depend on user_id
     auth_service = AuthenticationService(db_path)
-    expression_evaluator = ExpressionEvaluator()
-    symbolic_computer = SymbolicComputer()
+    symbolic_computer = SymbolicComputer()  # Assuming SymbolicComputer needs dao
     profile_manager = ProfileManager(db=dao)
     error_handler = ErrorHandler()
-    computation_history = ComputationHistory()
-    data_exporter = DataExporter()
+    data_exporter = DataExporter()  # Assuming DataExporter needs dao
 
     # GUI Initialization without passing the parent argument
     app = TkinterGUI(
         auth_service=auth_service,
-        expression_evaluator=expression_evaluator,
         symbolic_computer=symbolic_computer,
         profile_manager=profile_manager,
         error_handler=error_handler,
-        computation_history=computation_history,
         data_exporter=data_exporter,
-        db_path=db_path
+        db_path=db_path,
+        dao=dao  # Pass dao to the TkinterGUI
     )
+
+    # The GUI will handle the creation of the ExpressionEvaluator after login
     app.mainloop()
 
     # Close the database connection
