@@ -15,6 +15,7 @@ from Services.error_handler import ErrorHandler
 from Services.computation_history import ComputationHistory
 from Services.data_exporter import DataExporter
 from Gui.userview import TkinterGUI
+from Services.dao import SQLiteDataAccessObject
 import tkinter as tk
 import sympy as sp
 import re
@@ -202,25 +203,33 @@ def run_test():
         except Exception as e:
             print(f"ERROR: {expression} threw an exception: {e}")'''
 if __name__ == "__main__":
+    # Correctly specify the database path
+    db_path = 'my_project_database.db'  # Path to the database file
 
-    db = None  # Replace with actual database connection
-    auth_service = AuthenticationService(db)
-    expression_evaluator = ExpressionEvaluator()  # Use the ExpressionEvaluator class
-    graph_plotter = None,
+    # Initialize the SQLiteDataAccessObject with a valid db_name
+    dao = SQLiteDataAccessObject(db_name=db_path)
+
+    # Initialize the services
+    auth_service = AuthenticationService(db_path)
+    expression_evaluator = ExpressionEvaluator()
     symbolic_computer = SymbolicComputer()
-    profile_manager = ProfileManager(db)
-    data_access_object = SQLiteDataAccessObject(db)
+    profile_manager = ProfileManager(db=dao)
     error_handler = ErrorHandler()
     computation_history = ComputationHistory()
-    data_exporter = DataExporter()  # Make sure this is defined and passed
+    data_exporter = DataExporter()
 
-    # Correctly pass all required arguments to MainController
-    controller = MainController(
-        auth_service, expression_evaluator,graph_plotter, symbolic_computer,
-        profile_manager, data_access_object, error_handler, computation_history, data_exporter
+    # GUI Initialization without passing the parent argument
+    app = TkinterGUI(
+        auth_service=auth_service,
+        expression_evaluator=expression_evaluator,
+        symbolic_computer=symbolic_computer,
+        profile_manager=profile_manager,
+        error_handler=error_handler,
+        computation_history=computation_history,
+        data_exporter=data_exporter,
+        db_path=db_path
     )
-
-    # GUI Initialization
-    root = tk.Tk()
-    app = TkinterGUI(root, controller)
     app.mainloop()
+
+    # Close the database connection
+    dao.close()

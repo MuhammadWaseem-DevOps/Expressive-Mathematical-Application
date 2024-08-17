@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class IAuthenticationService(ABC):
     @abstractmethod
-    def authenticateUser(self, username: str, password: str) -> bool: pass
+    def authenticate_user(self, username: str, password: str) -> bool: pass
 
     @abstractmethod
-    def createUser(self, username: str, password: str, email: str) -> any: pass
+    def create_user(self, username: str, password: str, email: str) -> any: pass

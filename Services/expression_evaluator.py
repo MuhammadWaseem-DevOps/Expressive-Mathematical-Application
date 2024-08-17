@@ -504,11 +504,3 @@ class PiecewiseExpression:
                 return eval(expr.replace("x", str(x)))
         return None
 
-
-# Example Usage in Code:
-evaluator = ExpressionEvaluator()
-
-expression = "Polynomial([1, -4, 4]).find_roots()"
-result, steps = evaluator.evaluate(expression)
-print("Result:", result)
-print("Steps:\n", steps)
