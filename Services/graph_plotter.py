@@ -2,20 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
+import datetime
+import json
 from Interfaces.graph_plotter import IGraphPlotter
+import io
 
 class GraphPlotter(IGraphPlotter):
-    def __init__(self, canvas):
+    def __init__(self, canvas, dao, user_id):
         self.canvas = canvas
         self.figure = plt.Figure()
         self.ax = self.figure.add_subplot(111)
         self.plot_canvas = FigureCanvasTkAgg(self.figure, self.canvas)
         self.plot_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-    
+        self.dao = dao
+        self.user_id = user_id
+        
+        if self.user_id is None:
+            raise ValueError("User ID is None. Please ensure it is passed correctly.")
+
     def plot_function(self, function: str, x_min: float, x_max: float):
         x = np.linspace(x_min, x_max, 400)
         try:
-            # Define available functions from numpy for eval
             y = eval(function, {"np": np, "sin": np.sin, "cos": np.cos, "tan": np.tan, "exp": np.exp, "sqrt": np.sqrt, "log": np.log}, {"x": x})
         except Exception as e:
             print(f"Error in evaluating the function: {e}")
@@ -25,31 +32,59 @@ class GraphPlotter(IGraphPlotter):
         self.ax.set_title(f"Plot of {function}")
         self.ax.set_xlabel("x")
         self.ax.set_ylabel("y")
-        
-        # Add grid lines
         self.ax.grid(True, which='both')
-
-        # Set the axis to center (similar to Desmos)
         self.ax.spines['left'].set_position('zero')
         self.ax.spines['left'].set_color('black')
         self.ax.spines['left'].set_linewidth(0.5)
         self.ax.spines['bottom'].set_position('zero')
         self.ax.spines['bottom'].set_color('black')
         self.ax.spines['bottom'].set_linewidth(0.5)
-
-        # Hide the top and right spines
         self.ax.spines['right'].set_color('none')
         self.ax.spines['top'].set_color('none')
-
-        # Add arrows to the axes
         self.ax.plot(1, 0, ">k", transform=self.ax.get_yaxis_transform(), clip_on=False)
         self.ax.plot(0, 1, "^k", transform=self.ax.get_xaxis_transform(), clip_on=False)
-
-        # Set ticks position
         self.ax.xaxis.set_ticks_position('bottom')
         self.ax.yaxis.set_ticks_position('left')
-        
         self.plot_canvas.draw()
+
+        # Save the graph data
+        self.save_graph_data(function, x_min, x_max)
+
+    def save_graph_data(self, function: str, x_min: float, x_max: float):
+        """Save the graph data to the database."""
+        plot_settings = {
+            'x_min': x_min,
+            'x_max': x_max,
+        }
+
+        # Save the plot image as a PNG file in memory
+        buffer = io.BytesIO()
+        self.figure.savefig(buffer, format='png')
+        image_data = buffer.getvalue()
+        buffer.close()
+
+        # Save graph data in GRAPHICAL_FUNCTION table
+        graph_entry = {
+            'user_id': self.user_id,
+            'function': function,
+            'x_min': x_min,
+            'x_max': x_max,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'image': image_data
+        }
+        graph_data_id = self.dao.insert('GRAPHICAL_FUNCTION', graph_entry)
+
+        # Link to computation history
+        history_entry = {
+            'user_id': self.user_id,
+            'expression': function,
+            'result': 'Graph plotted',
+            'computation_type': 'Graphical Function',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'symbolic_steps': json.dumps(plot_settings),
+            'graph_data_id': graph_data_id
+        }
+        self.dao.insert('COMPUTATION_HISTORY', history_entry)
 
     def plot_parametric(self, x_func: str, y_func: str, t_min: float, t_max: float):
         t = np.linspace(t_min, t_max, 400)

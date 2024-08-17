@@ -2,6 +2,7 @@ import sqlite3
 import json
 import datetime
 from Interfaces.dao import IDataAccessObject
+
 class SQLiteDataAccessObject(IDataAccessObject):
     def __init__(self, db_name: str = 'example.db'):
         self.db_name = db_name
@@ -9,13 +10,15 @@ class SQLiteDataAccessObject(IDataAccessObject):
         self._create_tables()
 
     def _connect(self):
-        """Establishes a database connection."""
         return sqlite3.connect(self.db_name)
 
     def _create_tables(self):
-        """Creates necessary tables if they do not exist."""
         cursor = self.connection.cursor()
 
+        # Drop the existing GRAPHICAL_FUNCTION table if it exists
+        cursor.execute('''DROP TABLE IF EXISTS GRAPHICAL_FUNCTION''')
+
+        # Recreate all the necessary tables with the correct structure
         cursor.execute('''CREATE TABLE IF NOT EXISTS USER (
             user_id INTEGER PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
@@ -41,26 +44,24 @@ class SQLiteDataAccessObject(IDataAccessObject):
             history_id INTEGER PRIMARY KEY,
             user_id INTEGER NOT NULL,
             expression TEXT NOT NULL,
-            result TEXT NOT NULL,
+            result TEXT,
             computation_type TEXT NOT NULL,
             timestamp DATETIME NOT NULL,
-            symbolic_steps JSON NOT NULL,
-            graph_data BLOB,
-            FOREIGN KEY (user_id) REFERENCES USER (user_id)
-        )''')
-
-        cursor.execute('''CREATE TABLE IF NOT EXISTS EXPRESSION_EVALUATOR (
-            evaluator_id INTEGER PRIMARY KEY,
-            expression_type TEXT,
-            evaluation_method TEXT
+            symbolic_steps JSON,
+            graph_data_id INTEGER,
+            FOREIGN KEY (user_id) REFERENCES USER (user_id),
+            FOREIGN KEY (graph_data_id) REFERENCES GRAPHICAL_FUNCTION (graph_id)
         )''')
 
         cursor.execute('''CREATE TABLE IF NOT EXISTS GRAPHICAL_FUNCTION (
             graph_id INTEGER PRIMARY KEY,
-            history_id INTEGER NOT NULL,
-            function TEXT,
-            plot_settings JSON,
-            FOREIGN KEY (history_id) REFERENCES COMPUTATION_HISTORY (history_id)
+            user_id INTEGER NOT NULL,
+            function TEXT NOT NULL,
+            x_min REAL NOT NULL,
+            x_max REAL NOT NULL,
+            timestamp DATETIME NOT NULL,
+            image BLOB,
+            FOREIGN KEY (user_id) REFERENCES USER (user_id)
         )''')
 
         cursor.execute('''CREATE TABLE IF NOT EXISTS ERROR_LOG (
@@ -74,24 +75,23 @@ class SQLiteDataAccessObject(IDataAccessObject):
 
         self.connection.commit()
 
-    def insert_computation_history(self, user_id, expression, result, computation_type, symbolic_steps):
-        """Inserts symbolic computation history into the database."""
+    def insert_computation_history(self, user_id, expression, result, computation_type, symbolic_steps, graph_data_id=None):
         data = {
             'user_id': user_id,
             'expression': expression,
             'result': result,
             'computation_type': computation_type,
             'timestamp': datetime.datetime.now().isoformat(),
-            'symbolic_steps': json.dumps(symbolic_steps)
+            'symbolic_steps': json.dumps(symbolic_steps),
+            'graph_data_id': graph_data_id
         }
         return self.insert('COMPUTATION_HISTORY', data)
 
-    def get_computation_history(self, user_id):
-        """Fetches computation history for the specified user."""
-        return self.select('COMPUTATION_HISTORY', f"user_id = {user_id}")
-
     def insert(self, table: str, data: dict) -> int:
-        """Inserts a record into the specified table."""
+        # Ensure user_id is not None before inserting
+        if 'user_id' in data and data['user_id'] is None:
+            raise ValueError(f"Cannot insert into {table}: 'user_id' is None.")
+
         keys = ', '.join(data.keys())
         placeholders = ', '.join(['?' for _ in data])
         sql = f"INSERT INTO {table} ({keys}) VALUES ({placeholders})"
@@ -101,7 +101,6 @@ class SQLiteDataAccessObject(IDataAccessObject):
         return cursor.lastrowid
 
     def update(self, table: str, id: int, data: dict) -> bool:
-        """Updates a record in the specified table."""
         set_clause = ', '.join([f"{key} = ?" for key in data])
         sql = f"UPDATE {table} SET {set_clause} WHERE {table}_id = ?"
         cursor = self.connection.cursor()
@@ -110,7 +109,6 @@ class SQLiteDataAccessObject(IDataAccessObject):
         return cursor.rowcount > 0
 
     def delete(self, table: str, id: int) -> bool:
-        """Deletes a record from the specified table."""
         sql = f"DELETE FROM {table} WHERE {table}_id = ?"
         cursor = self.connection.cursor()
         cursor.execute(sql, (id,))
@@ -118,7 +116,6 @@ class SQLiteDataAccessObject(IDataAccessObject):
         return cursor.rowcount > 0
 
     def select(self, table: str, condition: str = "") -> list:
-        """Selects records from the specified table based on a condition."""
         sql = f"SELECT * FROM {table}"
         if condition:
             sql += f" WHERE {condition}"
@@ -126,6 +123,8 @@ class SQLiteDataAccessObject(IDataAccessObject):
         cursor.execute(sql)
         return cursor.fetchall()
 
+    def get_computation_history(self, user_id):
+        return self.select('COMPUTATION_HISTORY', f"user_id = {user_id}")
+
     def close(self):
-        """Closes the database connection."""
         self.connection.close()

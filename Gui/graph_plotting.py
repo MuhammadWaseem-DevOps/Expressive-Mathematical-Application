@@ -3,9 +3,10 @@ from tkinter import ttk
 from Services.graph_plotter import GraphPlotter
 
 class GraphPlotterFrame(ttk.Frame):
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, controller, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        
+        self.controller = controller
+
         # Configure styles
         self.style = ttk.Style()
         self.style.configure('GraphPlotter.TFrame', background='#f0f0f0')
@@ -37,8 +38,13 @@ class GraphPlotterFrame(ttk.Frame):
         self.plot_canvas = tk.Canvas(self, bg='#ffffff')
         self.plot_canvas.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
-        # Create an instance of GraphPlotter, passing the Canvas
-        self.graph_plotter = GraphPlotter(self.plot_canvas)
+        # Fetch the user ID
+        user_id = self.controller.auth_service.get_current_user_id()
+        if user_id is None:
+            raise ValueError("User ID is None. Please ensure the user is logged in.")
+
+        # Create an instance of GraphPlotter, passing the Canvas, DAO, and user ID
+        self.graph_plotter = GraphPlotter(self.plot_canvas, dao=self.controller.dao, user_id=user_id)
 
         # Bind the resize event to redraw the grid
         self.plot_canvas.bind("<Configure>", self.on_resize)
@@ -88,15 +94,12 @@ class GraphPlotterFrame(ttk.Frame):
             self.status_display.config(text=f"Error: {str(e)}", foreground="red")
 
     def on_resize(self, event):
-        """Redraw the grid when the canvas is resized."""
         self.draw_grid()
         self.graph_plotter.figure.set_size_inches(self.plot_canvas.winfo_width()/100, self.plot_canvas.winfo_height()/100)
         self.graph_plotter.plot_canvas.draw()
 
     def zoom_in(self):
-        """Handle zooming in."""
         self.graph_plotter.zoom_in()
 
     def zoom_out(self):
-        """Handle zooming out."""
         self.graph_plotter.zoom_out()

@@ -19,7 +19,6 @@ from DbSetup.dao import SQLiteDataAccessObject
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
 class TkinterGUI(ThemedTk):
     def __init__(self, auth_service=None, expression_evaluator=None,
                  symbolic_computer=None, profile_manager=None, error_handler=None,
@@ -29,7 +28,6 @@ class TkinterGUI(ThemedTk):
         self.geometry("1200x800")
         self.set_theme("arc")
 
-        # Initialize the DAO and services
         self.dao = dao or SQLiteDataAccessObject(db_name=db_path)
         self.auth_service = auth_service or AuthenticationService(db_path)
         self.evaluator = None  # Initialize later after login
@@ -40,7 +38,6 @@ class TkinterGUI(ThemedTk):
         self.data_exporter = data_exporter or DataExporter(self.dao)
         self.db_path = db_path
 
-        # Custom color theme
         self.bg_color = "#f4f4f4"
         self.sidebar_color = "#2c3e50"
         self.header_color = "#e74c3c"
@@ -49,26 +46,20 @@ class TkinterGUI(ThemedTk):
         self.success_color = "#27ae60"
         self.error_color = "#e74c3c"
 
-        # Set the main background color
         self.configure(bg=self.bg_color)
 
-        # Initialize Sidebar (Hidden initially)
-        self.sidebar_visible = False  # Track sidebar visibility
+        self.sidebar_visible = False
         self.sidebar = ttk.Frame(self, width=200, style='Sidebar.TFrame', relief='raised', borderwidth=2)
 
-        # Main Content Frame
         self.content_frame = ttk.Frame(self, style='Content.TFrame', padding=(20, 20))
         self.content_frame.grid(row=0, column=1, sticky="nsew")
 
-        # Initialize Frames
         self.frames = {}
-        self.init_frames()
+        self.init_login_frames()
 
-        # Configure grid layout for the main window
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Add a toggle button to the main window (hidden initially)
         self.toggle_button = ttk.Button(self, text="Toggle Sidebar", command=self.toggle_sidebar, style='Sidebar.TButton')
         self.toggle_button.grid(row=0, column=2, padx=(10, 20), pady=(20, 20), sticky="ne")
         self.toggle_button.grid_remove()
@@ -82,18 +73,14 @@ class TkinterGUI(ThemedTk):
             self.initialize_after_login()
 
     def initialize_after_login(self):
-        """Initialize components after user login."""
         user_id = self.auth_service.current_user_id
         if not user_id:
             raise ValueError("User ID is not set after login. Cannot initialize services requiring user ID.")
 
-        # Initialize the ExpressionEvaluator with the DAO and user_id
         self.evaluator = ExpressionEvaluator(dao=self.dao, user_id=user_id)
-        
-        # Initialize the ComputationHistory with the DAO and user_id
         self.computation_history = ComputationHistory(dao=self.dao, user_id=user_id)
 
-        # Initialize sidebar and show the dashboard
+        self.init_authenticated_frames()  # Initialize the frames that need the user to be logged in
         self.init_sidebar()
         self.showDashboard()
 
@@ -106,21 +93,27 @@ class TkinterGUI(ThemedTk):
 
         self.sidebar_visible = not self.sidebar_visible  # Toggle the visibility state
 
-    def init_frames(self):
-        """Initialize all the frames for the application."""
+    def init_login_frames(self):
+        """Initialize frames that do not require the user to be logged in."""
         self.frames["Login Interface"] = LoginScreen(self.content_frame, self)
         self.frames["Signup Interface"] = SignupScreen(self.content_frame, self)
-        self.frames["Dashboard"] = self.create_dashboard_frame()
-        self.frames["Expression Input"] = ExpressionInputFrame(self.content_frame, self)
-        self.frames["Graph Plotter"] = self.create_graph_plotter_frame()
-        self.frames["Symbolic Computation"] = SymbolicComputation(self.content_frame, self)
-        # Profile Management will be initialized after login
-        
+
         for frame in self.frames.values():
             frame.grid(row=0, column=0, sticky="nsew")
 
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(0, weight=1)
+
+    def init_authenticated_frames(self):
+        """Initialize frames that require the user to be logged in."""
+        self.frames["Dashboard"] = self.create_dashboard_frame()
+        self.frames["Expression Input"] = ExpressionInputFrame(self.content_frame, self)
+        self.frames["Graph Plotter"] = self.create_graph_plotter_frame()
+        self.frames["Symbolic Computation"] = SymbolicComputation(self.content_frame, self)
+        self.frames["Profile Management"] = ProfileManagement(self.content_frame, self)
+
+        for frame in self.frames.values():
+            frame.grid(row=0, column=0, sticky="nsew")
 
     def create_dashboard_frame(self):
         """Create the dashboard frame."""
@@ -131,7 +124,7 @@ class TkinterGUI(ThemedTk):
 
     def create_graph_plotter_frame(self):
         """Create and return an instance of the GraphPlotterFrame."""
-        return GraphPlotterFrame(self.content_frame)
+        return GraphPlotterFrame(self.content_frame, self)
 
     def init_sidebar(self):
         """Initialize the sidebar with buttons and icons."""

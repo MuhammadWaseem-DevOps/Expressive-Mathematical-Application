@@ -202,20 +202,16 @@ def run_test():
         except Exception as e:
             print(f"ERROR: {expression} threw an exception: {e}")'''
 if __name__ == "__main__":
-    # Correctly specify the database path
-    db_path = 'my_project_database.db'  # Path to the database file
+    db_path = 'my_project_database.db'
 
-    # Initialize the SQLiteDataAccessObject with a valid db_name
     dao = SQLiteDataAccessObject(db_name=db_path)
 
-    # Initialize the services that don't depend on user_id
     auth_service = AuthenticationService(db_path)
-    symbolic_computer = SymbolicComputer()  # Assuming SymbolicComputer needs dao
+    symbolic_computer = SymbolicComputer()
     profile_manager = ProfileManager(db=dao)
     error_handler = ErrorHandler()
-    data_exporter = DataExporter()  # Assuming DataExporter needs dao
+    data_exporter = DataExporter()
 
-    # GUI Initialization without passing the parent argument
     app = TkinterGUI(
         auth_service=auth_service,
         symbolic_computer=symbolic_computer,
@@ -223,11 +219,9 @@ if __name__ == "__main__":
         error_handler=error_handler,
         data_exporter=data_exporter,
         db_path=db_path,
-        dao=dao  # Pass dao to the TkinterGUI
+        dao=dao
     )
 
-    # The GUI will handle the creation of the ExpressionEvaluator after login
     app.mainloop()
 
-    # Close the database connection
     dao.close()
