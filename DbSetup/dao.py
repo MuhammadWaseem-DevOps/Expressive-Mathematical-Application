@@ -15,10 +15,6 @@ class SQLiteDataAccessObject(IDataAccessObject):
     def _create_tables(self):
         cursor = self.connection.cursor()
 
-        # Drop the existing GRAPHICAL_FUNCTION table if it exists
-        cursor.execute('''DROP TABLE IF EXISTS GRAPHICAL_FUNCTION''')
-
-        # Recreate all the necessary tables with the correct structure
         cursor.execute('''CREATE TABLE IF NOT EXISTS USER (
             user_id INTEGER PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
@@ -88,7 +84,6 @@ class SQLiteDataAccessObject(IDataAccessObject):
         return self.insert('COMPUTATION_HISTORY', data)
 
     def insert(self, table: str, data: dict) -> int:
-        # Ensure user_id is not None before inserting
         if 'user_id' in data and data['user_id'] is None:
             raise ValueError(f"Cannot insert into {table}: 'user_id' is None.")
 
@@ -122,6 +117,12 @@ class SQLiteDataAccessObject(IDataAccessObject):
         cursor = self.connection.cursor()
         cursor.execute(sql)
         return cursor.fetchall()
+
+    def execute_query(self, query: str, params=()) -> list:
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        return cursor.fetchall()
+
 
     def get_computation_history(self, user_id):
         return self.select('COMPUTATION_HISTORY', f"user_id = {user_id}")

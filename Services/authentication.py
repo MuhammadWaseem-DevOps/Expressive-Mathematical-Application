@@ -2,12 +2,14 @@ import hashlib
 import re
 from tkinter import messagebox
 from DbSetup.dao import SQLiteDataAccessObject
+from Services.profile_manager import ProfileManager
 import logging
 
 class AuthenticationService:
     def __init__(self, db):
         self.dao = SQLiteDataAccessObject(db_name=db)
-        self.current_user_id = None  # Track the logged-in user's ID
+        self.profile_manager = ProfileManager(self.dao)
+        self.current_user_id = None # Track the logged-in user's ID
 
     def hash_password(self, password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
@@ -59,14 +61,32 @@ class AuthenticationService:
     def authenticate_user(self, username: str, password: str) -> bool:
         password_hash = self.hash_password(password)
         result = self.dao.select("USER", f"username = '{username}' AND password_hash = '{password_hash}'")
+        
         if len(result) == 0:
             messagebox.showerror("Authentication Failed", "Invalid username or password.")
             return False
         else:
             self.current_user_id = result[0][0]  # Set the current user ID upon successful login
             logging.debug(f"User ID set to {self.current_user_id}")
+            
+            # Ensure the ProfileManager instance is accessible
+            profile_manager = self.profile_manager
+            
+            # Check if the profile exists and create it if it doesn't
+            profile_data = profile_manager.getProfile(self.current_user_id)  # Pass the current user ID
+            
+            if not profile_data:
+                # Create the profile if it doesn't exist
+                user_data = {
+                    'user_id': self.current_user_id,
+                    'first_name': result[0][4],  # Assuming first_name is in the 5th column
+                    'last_name': result[0][5]    # Assuming last_name is in the 6th column
+                }
+                profile_manager.createProfile(user_data)
+            
             messagebox.showinfo("Login Success", "Welcome back!")
             return True
+
 
     def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
         """Change the user's password."""

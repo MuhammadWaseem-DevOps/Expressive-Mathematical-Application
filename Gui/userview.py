@@ -16,6 +16,7 @@ from Gui.expression_evaluator import ExpressionInputFrame
 from Services.authentication import AuthenticationService
 from Services.computation_history import ComputationHistory
 from DbSetup.dao import SQLiteDataAccessObject
+from Gui.dashboardframe import DashboardFrame
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -106,7 +107,7 @@ class TkinterGUI(ThemedTk):
 
     def init_authenticated_frames(self):
         """Initialize frames that require the user to be logged in."""
-        self.frames["Dashboard"] = self.create_dashboard_frame()
+        self.frames["Dashboard"] = DashboardFrame(self.content_frame, self)
         self.frames["Expression Input"] = ExpressionInputFrame(self.content_frame, self)
         self.frames["Graph Plotter"] = self.create_graph_plotter_frame()
         self.frames["Symbolic Computation"] = SymbolicComputation(self.content_frame, self)

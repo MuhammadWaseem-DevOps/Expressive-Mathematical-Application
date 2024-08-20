@@ -15,5 +15,20 @@ class ComputationHistory:
         }
         self.dao.insert('GRAPHICAL_FUNCTION', graph_entry)
 
-    def get_history(self) -> list:
-        return self.dao.get_computation_history(self.user_id)
+    def get_history(self, offset=0, limit=15) -> list:
+        """Fetch computation history with pagination."""
+        query = f"SELECT * FROM COMPUTATION_HISTORY WHERE user_id = {self.user_id} ORDER BY timestamp DESC LIMIT {limit} OFFSET {offset}"
+        return self.dao.execute_query(query)
+
+    def search_history(self, query_str) -> list:
+        """Search computation history for a specific query."""
+        query = f"SELECT * FROM COMPUTATION_HISTORY WHERE user_id = {self.user_id} AND expression LIKE '%{query_str}%' ORDER BY timestamp DESC"
+        return self.dao.execute_query(query)
+
+    def get_computation_details(self, computation_id) -> dict:
+        """Get details of a specific computation."""
+        query = f"SELECT * FROM COMPUTATION_HISTORY WHERE history_id = {computation_id}"
+        computation = self.dao.execute_query(query)
+        if computation:
+            return computation[0]
+        return None
