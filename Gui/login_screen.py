@@ -33,9 +33,6 @@ class LoginScreen(ctk.CTkFrame):
         welcome_label = ctk.CTkLabel(right_frame, text="Welcome back you've been missed!", font=("Helvetica", 18))
         welcome_label.pack(pady=(10, 30))
 
-        or_label = ctk.CTkLabel(right_frame, text="Or sign in with", font=("Helvetica", 14))
-        or_label.pack(pady=(20, 10))
-
         self.username_entry = ctk.CTkEntry(right_frame, placeholder_text="Username", width=250)
         self.username_entry.pack(pady=(10, 10))
 

@@ -1,8 +1,12 @@
 import math
 import re
 from collections import deque
-import json
 import datetime
+import networkx as nx
+import matplotlib.pyplot as plt
+from io import BytesIO
+from PIL import Image, ImageTk
+import json
 
 class ExpressionEvaluator:
     def __init__(self, dao, user_id):
@@ -33,43 +37,58 @@ class ExpressionEvaluator:
         # Reset the history saved flag before each evaluation
         self._history_saved = False
 
+        self.solver.log_expression(expression)
+        
         # Parse and evaluate
-        parser = self.Parser(expression)
+        parser = self.Parser(expression, self.solver)
         ast = parser.parse()
+        self.solver.log_ast_generation(ast)
+        
         result = self._evaluate_ast(ast)
-        steps = self.solver.get_steps()
+        steps = self.solver.get_detailed_steps()
 
         # Save the result and steps to the computation history
         self.save_to_history(expression, result, steps)
 
-        return result, steps
+        # Generate and display the AST
+        ast_image = parser.draw_ast(ast)
+        self.solver.log_final_result(result)
+        return result, steps, ast_image
 
     def _evaluate_ast(self, node):
         if node is None:
             return None
 
         if node.left is None and node.right is None:
+            value = None
             if node.value.replace('.', '', 1).isdigit():
-                return float(node.value)
+                value = float(node.value)
+                self.solver.log_leaf_node(node.value, value)
             elif node.value in self.variables:
-                return self.variables[node.value]
+                value = self.variables[node.value]
+                self.solver.log_variable(node.value, value)
             elif node.value in self.constants:
-                return self.constants[node.value]
+                value = self.constants[node.value]
+                self.solver.log_constant(node.value, value)
             elif node.value in self.functions:
-                return self.functions[node.value]
+                value = self.functions[node.value]
+                self.solver.log_function(node.value, value)
             elif '.' in node.value:
-                return self._handle_method_call(node.value)
+                value = self._handle_method_call(node.value)
             else:
-                return self._instantiate_object(node.value)
+                value = self._instantiate_object(node.value)
+            return value
 
         left_val = self._evaluate_ast(node.left)
         right_val = self._evaluate_ast(node.right)
 
         if node.value == '=':
             self.variables[node.left.value] = right_val
+            self.solver.log_assignment(node.left.value, right_val)
             return right_val
 
-        return self._apply_operator(node.value, left_val, right_val)
+        result = self._apply_operator(node.value, left_val, right_val, node)
+        return result
 
     def _handle_method_call(self, method_call):
         try:
@@ -82,9 +101,9 @@ class ExpressionEvaluator:
             method = getattr(obj, method_name, None)
             if method is None:
                 raise ValueError(f"Method {method_name} not found in object {obj_name}.")
-            args_values = [self._evaluate_ast(self.Parser(arg.strip()).parse()) if arg else None for arg in args.split(',')] if args else []
+            args_values = [self._evaluate_ast(self.Parser(arg.strip(), self.solver).parse()) if arg else None for arg in args.split(',')] if args else []
             result = method(*args_values)
-            self.solver.log_step(f"Calling method {method_name} of {obj_name} with args {args_values}", result)
+            self.solver.log_method_call(obj_name, method_name, args_values, result)
             return result
         except Exception as e:
             raise ValueError(f"Failed to handle method call: {str(e)}")
@@ -96,7 +115,7 @@ class ExpressionEvaluator:
             if class_name in self.object_classes:
                 params_list = self._parse_parameters(params)
                 obj = self.object_classes[class_name](*params_list)
-                self.solver.log_step(f"Instantiated {class_name} with params {params_list}", obj)
+                self.solver.log_instantiation(class_name, params_list, obj)
                 return obj
             else:
                 raise ValueError(f"Unknown class {class_name}")
@@ -123,10 +142,13 @@ class ExpressionEvaluator:
                 current_param += char
         if current_param:
             param_list.append(current_param.strip())
-        return [self._evaluate_ast(self.Parser(param).parse()) for param in param_list]
+        parsed_params = [self._evaluate_ast(self.Parser(param, self.solver).parse()) for param in param_list]
+        self.solver.log_parsed_parameters(params, parsed_params)
+        return parsed_params
 
-    def _apply_operator(self, operator, left_val, right_val):
+    def _apply_operator(self, operator, left_val, right_val, node):
         try:
+            result = None
             if isinstance(left_val, Polynomial) or isinstance(right_val, Polynomial):
                 if operator == '+':
                     result = left_val + right_val
@@ -136,7 +158,7 @@ class ExpressionEvaluator:
                     result = left_val * right_val
                 elif operator == '/':
                     result = left_val.long_division(right_val)
-                self.solver.log_step(f"Applied operator {operator} on {left_val} and {right_val}", result)
+                self.solver.log_operation(operator, left_val, right_val, result, node)
                 return result
             if operator == '+':
                 result = left_val + right_val
@@ -164,7 +186,7 @@ class ExpressionEvaluator:
                 result = abs(right_val)
             else:
                 raise ValueError(f"Unknown operator: {operator}")
-            self.solver.log_step(f"Applied operator {operator} on {left_val} and {right_val}", result)
+            self.solver.log_operation(operator, left_val, right_val, result, node)
             return result
         except Exception as e:
             raise ValueError(f"Failed to apply operator: {str(e)}")
@@ -184,17 +206,21 @@ class ExpressionEvaluator:
             self._history_saved = True  # Mark as saved to prevent duplicates
 
     class Parser:
-        def __init__(self, expression):
+        def __init__(self, expression, solver):
             self.expression = expression
             self.tokens = self.tokenize(expression)
             self.pos = 0
+            self.solver = solver
+            self.solver.log_tokenization(self.tokens)
+            self.graph = nx.DiGraph()
 
         def tokenize(self, expression):
             token_pattern = re.compile(r'\d+\.?\d*|[a-zA-Z_]\w*|[()+\-*/^=<>!&|]')
             return token_pattern.findall(expression)
 
         def parse(self):
-            return self.expression_to_ast()
+            ast = self.expression_to_ast()
+            return ast
 
         def expression_to_ast(self):
             output = deque()
@@ -208,35 +234,66 @@ class ExpressionEvaluator:
                 right = output.pop()
                 if operator in ['and', 'or', 'not']:
                     output.append(ExpressionEvaluator.ASTNode(operator, right))
+                    self.graph.add_node(id(output[-1]), label=operator)
+                    self.graph.add_edge(id(output[-1]), id(right))
                 else:
                     left = output.pop()
                     output.append(ExpressionEvaluator.ASTNode(operator, left, right))
+                    self.graph.add_node(id(output[-1]), label=operator)
+                    self.graph.add_edge(id(output[-1]), id(left))
+                    self.graph.add_edge(id(output[-1]), id(right))
+                self.solver.log_operator_application(operator, output[-1])
 
             while self.pos < len(self.tokens):
                 token = self.tokens[self.pos]
 
                 if token.isnumeric() or token.replace('.', '', 1).isdigit():
-                    output.append(ExpressionEvaluator.ASTNode(token))
+                    node = ExpressionEvaluator.ASTNode(token)
+                    output.append(node)
+                    self.graph.add_node(id(node), label=token)
+                    self.solver.log_numeric_token(token, node)
                 elif token.isalpha() or token in ['pi', 'e']:
-                    output.append(ExpressionEvaluator.ASTNode(token))
+                    node = ExpressionEvaluator.ASTNode(token)
+                    output.append(node)
+                    self.graph.add_node(id(node), label=token)
+                    self.solver.log_identifier_token(token, node)
                 elif token in precedence:
                     while (operators and operators[-1] != '(' and
                            (precedence[operators[-1]] > precedence[token] or
                             (precedence[operators[-1]] == precedence[token] and associativity[token] == 'L'))):
                         apply_operator()
                     operators.append(token)
+                    self.solver.log_operator_token(token, list(operators))
                 elif token == '(':
                     operators.append(token)
+                    self.solver.log_left_parenthesis(list(operators))
                 elif token == ')':
                     while operators[-1] != '(':
                         apply_operator()
                     operators.pop()
+                    self.solver.log_right_parenthesis(list(operators))
                 self.pos += 1
 
             while operators:
                 apply_operator()
 
+            self.solver.log_ast_structure(output[-1])
             return output.pop()
+
+        def draw_ast(self, ast_node):
+            """Draw the AST using matplotlib and return the image."""
+            pos = nx.shell_layout(self.graph)  # Use shell_layout for better circular layout
+            labels = nx.get_node_attributes(self.graph, 'label')
+
+            plt.figure(figsize=(10, 10))
+            nx.draw(self.graph, pos, labels=labels, with_labels=True, arrows=False, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold")
+            plt.title("Abstract Syntax Tree")
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            image = Image.open(buf)
+            return image
 
     class ASTNode:
         def __init__(self, value, left=None, right=None):
@@ -244,16 +301,97 @@ class ExpressionEvaluator:
             self.left = left
             self.right = right
 
+        def __repr__(self):
+            return f"ASTNode(value={self.value}, left={self.left}, right={self.right})"
+
 
 # Step-by-Step Solver to track each step of the evaluation process
 class StepByStepSolver:
     def __init__(self):
         self.steps = []
 
-    def log_step(self, description, result):
-        self.steps.append(f"{description}: {result}")
+    def log_expression(self, expression):
+        self.steps.append(f"Input Expression:\nThe expression given is: {expression}\n")
 
-    def get_steps(self):
+    def log_tokenization(self, tokens):
+        numbers = [token for token in tokens if token.isdigit()]
+        operators = [token for token in tokens if not token.isdigit() and token not in '()']
+        parentheses = [token for token in tokens if token in '()']
+        self.steps.append(f"Tokenization:\nThe expression is broken down into the following components:\n"
+                          f"Numbers: {', '.join(numbers)}\n"
+                          f"Operators: {', '.join(operators)}\n"
+                          f"Parentheses: {', '.join(parentheses)}\n")
+
+    def log_ast_generation(self, ast):
+        self.steps.append("Building the Expression Tree:\n")
+
+    def log_numeric_token(self, token, node):
+        self.steps.append(f"Inserting numeric token '{token}' as a leaf node.\n")
+
+    def log_identifier_token(self, token, node):
+        self.steps.append(f"Inserting identifier token '{token}' as a leaf node.\n")
+
+    def log_operator_token(self, token, operators):
+        self.steps.append(f"Inserting operator token '{token}' into the operator stack. Stack now: {operators}\n")
+
+    def log_left_parenthesis(self, operators):
+        self.steps.append(f"Left parenthesis found. Stack now: {operators}\n")
+
+    def log_right_parenthesis(self, operators):
+        self.steps.append(f"Right parenthesis found. Resolving operations in the stack. Stack now: {operators}\n")
+
+    def log_operator_application(self, operator, node):
+        self.steps.append(f"Creating a new subtree with operator '{operator}' as the root node.\n"
+                          f"  - Left child: {node.left.value}\n"
+                          f"  - Right child: {node.right.value}\n")
+
+    def log_ast_structure(self, node):
+        structure = self._format_ast(node)
+        self.steps.append(f"Constructed AST:\n{structure}\n")
+
+    def _format_ast(self, node, level=0):
+        """Recursively format the AST structure."""
+        if node is None:
+            return ""
+        result = f"{'  ' * level}Node '{node.value}'\n"
+        if node.left:
+            result += f"{'  ' * (level + 1)}Left child of '{node.value}':\n{self._format_ast(node.left, level + 2)}"
+        if node.right:
+            result += f"{'  ' * (level + 1)}Right child of '{node.value}':\n{self._format_ast(node.right, level + 2)}"
+        return result
+
+    def log_leaf_node(self, value, evaluated_value):
+        self.steps.append(f"Evaluating Leaf Node '{value}': Value is {evaluated_value}\n")
+
+    def log_variable(self, variable, value):
+        self.steps.append(f"Using variable '{variable}' with value {value}\n")
+
+    def log_constant(self, constant, value):
+        self.steps.append(f"Using constant '{constant}' with value {value}\n")
+
+    def log_function(self, function, value):
+        self.steps.append(f"Using function '{function}'\n")
+
+    def log_method_call(self, obj_name, method_name, args_values, result):
+        self.steps.append(f"Calling method '{method_name}' of object '{obj_name}' with arguments {args_values}. Result: {result}\n")
+
+    def log_instantiation(self, class_name, params_list, obj):
+        self.steps.append(f"Instantiating object of class '{class_name}' with parameters {params_list}. Resulting object: {obj}\n")
+
+    def log_parsed_parameters(self, params, parsed_params):
+        self.steps.append(f"Parsed parameters from '{params}' as {parsed_params}\n")
+
+    def log_assignment(self, variable, value):
+        self.steps.append(f"Assigning value {value} to variable '{variable}'\n")
+
+    def log_operation(self, operator, left_val, right_val, result, node):
+        self.steps.append(f"Evaluating operation '{operator}' on left operand {left_val} and right operand {right_val} "
+                          f"results in {result}. Node '{node.value}' updated with result.\n")
+
+    def log_final_result(self, result):
+        self.steps.append(f"Final Calculation:\nThe final result of the expression evaluation is: {result}\n")
+
+    def get_detailed_steps(self):
         return "\n".join(self.steps)
 
 
@@ -448,7 +586,7 @@ class RationalExpression:
         
         gcd_value = gcd(self.numerator.coefficients[-1], self.denominator.coefficients[-1])
         simplified_numerator = [c // gcd_value for c in self.numerator.coefficients]
-        simplified_denominator = [c // gcd_value for c in self.denominator.coefficients]
+        simplified_denominator = [c // gcd_value for c in the.denominator.coefficients]
 
         return RationalExpression(simplified_numerator, simplified_denominator)
 
@@ -494,16 +632,16 @@ class InequalityExpression:
             return left_val > right_val
         elif self.operator == '<':
             return left_val < right_val
-        elif self.operator == '>=':
+        elif this.operator == '>=':
             return left_val >= right_val
-        elif self.operator == '<=':
+        elif this.operator == '<=':
             return left_val <= right_val
 
     def to_interval(self):
         solution = self.solve()
         if '>' in self.operator:
             return f"({self.right_expr}, ∞)"
-        elif '<' in self.operator:
+        elif '<' in this.operator:
             return f"(-∞, {self.right_expr})"
 
 

@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from PIL import Image, ImageTk
+from tkinter.scrolledtext import ScrolledText
 
 class ExpressionInputFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -11,7 +11,8 @@ class ExpressionInputFrame(ttk.Frame):
         
         # Configure the grid layout
         self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=2)  # Give more weight to the text output column
+        self.grid_columnconfigure(1, weight=1)  # Ensure the image gets resized appropriately
 
         # Create widgets
         self.create_widgets()
@@ -19,7 +20,7 @@ class ExpressionInputFrame(ttk.Frame):
     def create_widgets(self):
         """Create the widgets for the expression input frame."""
         header_frame = ttk.Frame(self, padding=(10, 10))
-        header_frame.grid(row=0, column=0, pady=(10, 20), sticky="ew")
+        header_frame.grid(row=0, column=0, columnspan=2, pady=(10, 20), sticky="ew")
         header_frame.grid_columnconfigure(1, weight=1)
         
         ttk.Label(header_frame, text="Enter a problem", font=("Helvetica", 14), foreground="#2c3e50").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -30,12 +31,16 @@ class ExpressionInputFrame(ttk.Frame):
         eval_button = ttk.Button(header_frame, text="Go", command=self.evaluate_expression, style='Sidebar.TButton')
         eval_button.grid(row=0, column=2, padx=10, pady=10)
 
-        # Output frame to display the result and steps
-        self.output_text = tk.Text(self, wrap='word', height=10, state='disabled', font=("Helvetica", 12))
+        # Scrolled output frame to display the result and steps
+        self.output_text = ScrolledText(self, wrap='word', height=10, state='disabled', font=("Helvetica", 12))
         self.output_text.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
+        # Frame to display AST image
+        self.tree_image_label = ttk.Label(self)
+        self.tree_image_label.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
+
         save_frame = ttk.Frame(self, padding=(10, 10))
-        save_frame.grid(row=2, column=0, pady=(20, 10), sticky="ew")
+        save_frame.grid(row=2, column=0, columnspan=2, pady=(20, 10), sticky="ew")
         save_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         save_button = ttk.Button(save_frame, text="Save Output", command=self.save_output, style='Sidebar.TButton')
@@ -47,45 +52,88 @@ class ExpressionInputFrame(ttk.Frame):
         export_image_button = ttk.Button(save_frame, text="Export as Image", command=self.export_as_image, style='Sidebar.TButton')
         export_image_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
+        # Bind resizing event to update the image size
+        self.tree_image_label.bind('<Configure>', self.resize_image)
+
     def evaluate_expression(self):
         """Evaluate the mathematical expression provided by the user and display the result."""
-        expression = self.expression_entry.get()
-        try:
-            # Log start of evaluation
-            print("Starting evaluation of expression:", expression)
+        self.clear_output()  # Clear previous output first
 
+        expression = self.expression_entry.get()
+        if not expression:
+            self.display_error_popup("Please enter an expression to evaluate.")
+            return
+
+        try:
             # Assuming controller has an evaluator instance
-            result, steps = self.controller.evaluator.evaluate(expression)
+            result, steps, ast_image = self.controller.evaluator.evaluate(expression)
+
+            # Now update the text and image with the new evaluation result
             result_text = f"Result: {result}\n\nSteps:\n{steps}"
             self.display_result(result_text)
+
+            # Display the AST image
+            self.ast_image = ast_image  # Save the original image for resizing
+            self.display_ast_image()
 
             # Save the result to the computation history
             self.save_to_history(expression, result, steps)
 
-            # Log end of evaluation
-            print("Completed evaluation and saved to history.")
-
         except Exception as e:
             self.display_error_popup(f"Error evaluating expression: {e}")
 
+    def clear_output(self):
+        """Clear the output area."""
+        self.output_text.config(state='normal')
+        self.output_text.delete(1.0, tk.END)  # Clear the text widget
+        self.output_text.config(state='disabled')  # Re-disable the text widget after clearing
+        self.tree_image_label.config(image='')  # Clear the AST image
+        self.ast_image = None  # Reset the ast_image reference
+
     def display_result(self, result_text):
         """Display the result in the output_text widget."""
-        self.output_text.config(state='normal')
-        self.output_text.delete(1.0, tk.END)
+        self.output_text.config(state='normal')  # Enable the text widget for updates
         self.output_text.insert(tk.END, result_text)
-        self.output_text.config(state='disabled')
+        self.output_text.config(state='disabled')  # Lock the text widget again
+
+    def display_ast_image(self):
+        """Display the AST image."""
+        if self.ast_image:
+            # Resize the image to fit the label size
+            label_width = self.tree_image_label.winfo_width()
+            label_height = self.tree_image_label.winfo_height()
+
+            if label_width > 1 and label_height > 1:  # Check if the label size is valid
+                # Ensure image maintains aspect ratio
+                img_ratio = self.ast_image.width / self.ast_image.height
+                label_ratio = label_width / label_height
+
+                if label_ratio > img_ratio:
+                    # Height is the constraining dimension
+                    new_height = label_height
+                    new_width = int(new_height * img_ratio)
+                else:
+                    # Width is the constraining dimension
+                    new_width = label_width
+                    new_height = int(new_width / img_ratio)
+
+                resized_image = self.ast_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(resized_image)
+                
+                self.tree_image_label.config(image=photo)
+                self.tree_image_label.image = photo  # Keep a reference to avoid garbage collection
+
+    def resize_image(self, event):
+        """Handle resizing of the image when the label size changes."""
+        self.display_ast_image()
 
     def save_to_history(self, expression, result, steps):
         """Save the evaluation result and steps to the computation history."""
-        # The actual saving to history is managed by the ExpressionEvaluator, so no need to check the flag here.
         self.controller.evaluator.save_to_history(expression, result, steps)
 
     def display_error_popup(self, message):
         """Display an error message in a popup dialog."""
         messagebox.showerror("Error", message)
-
-    # The save_output, export_as_pdf, and export_as_image methods remain unchanged...
-
 
     def save_output(self):
         """Save the current output to a file."""
@@ -123,3 +171,8 @@ class ExpressionInputFrame(ttk.Frame):
                 messagebox.showinfo("Export as Image", "This function has been disabled due to errors with image handling.")
             except Exception as e:
                 messagebox.showerror("Export as Image", f"Failed to export as image: {e}")
+
+    def clear_all(self):
+        """Clear both the input field and the output area."""
+        self.expression_entry.delete(0, tk.END)  # Clear the input entry field
+        self.clear_output()  # Clear the output area

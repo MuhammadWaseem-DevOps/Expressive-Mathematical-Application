@@ -97,9 +97,19 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                result, steps = self.computer.evaluate_expression(expression)
+                # Check if the expression looks like a matrix (basic check)
+                if expression.startswith("[[") and expression.endswith("]]"):
+                    result = self.computer.matrix_operations(expression)
+                    self.display_result(f"Matrix Result: {result['matrix']}\n"
+                                        f"Determinant: {result['determinant']}\n"
+                                        f"Inverse: {result['inverse']}\n"
+                                        f"Eigenvalues: {result['eigenvalues']}")
+                    steps = result['steps']
+                else:
+                    result, steps = self.computer.evaluate_expression(expression)
+                    self.display_result(f"Result: {result}")
+                    
                 self.last_steps = steps  # Store steps for later display
-                self.display_result(f"Result: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Calculation completed successfully.")
                 self.save_computation_to_db(expression, result, steps, "evaluation")  # Save to DB
