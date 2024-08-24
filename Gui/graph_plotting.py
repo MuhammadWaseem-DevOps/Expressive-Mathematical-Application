@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog, messagebox
 from Services.graph_plotter import GraphPlotter
 
 class GraphPlotterFrame(ttk.Frame):
@@ -15,7 +15,7 @@ class GraphPlotterFrame(ttk.Frame):
         self.style.configure('Zoom.TButton', padding=6, font=("Helvetica", 10))
 
         # Create sidebar frame
-        self.sidebar_frame = ttk.Frame(self, width=200, style='Sidebar.TFrame')
+        self.sidebar_frame = ttk.Frame(self, width=250, style='Sidebar.TFrame')
         self.sidebar_frame.grid(row=0, column=0, sticky="ns")
 
         # Add entries and buttons to the sidebar
@@ -23,16 +23,39 @@ class GraphPlotterFrame(ttk.Frame):
         self.function_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
         self.function_entry.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
 
-        ttk.Label(self.sidebar_frame, text="X Min:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=2, column=0, padx=10, pady=(10, 5), sticky=tk.W)
-        self.x_min_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
-        self.x_min_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        ttk.Label(self.sidebar_frame, text="Variable (x/y):", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=2, column=0, padx=10, pady=(10, 5), sticky=tk.W)
+        self.variable_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
+        self.variable_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        self.variable_entry.insert(0, "x")
 
-        ttk.Label(self.sidebar_frame, text="X Max:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=4, column=0, padx=10, pady=(10, 5), sticky=tk.W)
-        self.x_max_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
-        self.x_max_entry.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+        ttk.Label(self.sidebar_frame, text="Range Start:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=4, column=0, padx=10, pady=(10, 5), sticky=tk.W)
+        self.range_start_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
+        self.range_start_entry.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+
+        ttk.Label(self.sidebar_frame, text="Range End:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=6, column=0, padx=10, pady=(10, 5), sticky=tk.W)
+        self.range_end_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
+        self.range_end_entry.grid(row=7, column=0, padx=10, pady=5, sticky="ew")
+
+        ttk.Label(self.sidebar_frame, text="Function Type:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=8, column=0, padx=10, pady=(10, 5), sticky=tk.W)
+        self.function_type_combobox = ttk.Combobox(self.sidebar_frame, font=("Helvetica", 12), state="readonly", values=[
+            "Linear", "Quadratic", "Cubic", "Polynomial", "Exponential", 
+            "Logarithmic", "Trigonometric", "Rational", "Implicit"
+        ])
+        self.function_type_combobox.current(0)
+        self.function_type_combobox.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
+
+        # Units for trigonometric functions
+        self.units_label = ttk.Label(self.sidebar_frame, text="Units (for trig):", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50')
+        self.units_label.grid(row=10, column=0, padx=10, pady=(10, 5), sticky=tk.W)
+        self.units_combobox = ttk.Combobox(self.sidebar_frame, font=("Helvetica", 12), state="readonly", values=["Radians", "Degrees"])
+        self.units_combobox.current(0)
+        self.units_combobox.grid(row=11, column=0, padx=10, pady=5, sticky="ew")
 
         plot_button = ttk.Button(self.sidebar_frame, text="Plot", command=self.plot_graph, style='Sidebar.TButton')
-        plot_button.grid(row=6, column=0, padx=10, pady=(20, 10), sticky="ew")
+        plot_button.grid(row=12, column=0, padx=10, pady=(20, 10), sticky="ew")
+
+        export_button = ttk.Button(self.sidebar_frame, text="Export", command=self.export_graph, style='Sidebar.TButton')
+        export_button.grid(row=13, column=0, padx=10, pady=(10, 10), sticky="ew")
 
         # Create the main plot canvas
         self.plot_canvas = tk.Canvas(self, bg='#ffffff')
@@ -86,12 +109,36 @@ class GraphPlotterFrame(ttk.Frame):
     def plot_graph(self):
         try:
             function = self.function_entry.get()
-            x_min = float(self.x_min_entry.get())
-            x_max = float(self.x_max_entry.get())
-            self.graph_plotter.plot_function(function, x_min, x_max)
+            variable = self.variable_entry.get().strip()
+            range_start = float(self.range_start_entry.get())
+            range_end = float(self.range_end_entry.get())
+            function_type = self.function_type_combobox.get()
+            units = self.units_combobox.get()
+
+            if function_type == "Implicit":
+                y_min, y_max = range_start, range_end  # For implicit functions, we need y-range too
+                self.graph_plotter.plot_implicit(function, range_start, range_end, y_min, y_max)
+            else:
+                self.graph_plotter.plot_function(function, variable, range_start, range_end, function_type, units)
+
             self.status_display.config(text="Graph plotted successfully.")
         except Exception as e:
             self.status_display.config(text=f"Error: {str(e)}", foreground="red")
+
+    def export_graph(self):
+        """Export the graph as an image or PDF."""
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[
+            ("PNG Image", "*.png"),
+            ("PDF Document", "*.pdf"),
+            ("All Files", "*.*")
+        ])
+        if file_path:
+            try:
+                file_format = file_path.split('.')[-1]
+                self.graph_plotter.export_plot(file_path, file_format)
+                messagebox.showinfo("Export Successful", f"Graph has been exported as {file_format.upper()}.")
+            except Exception as e:
+                messagebox.showerror("Export Error", f"Failed to export graph: {str(e)}")
 
     def on_resize(self, event):
         self.draw_grid()

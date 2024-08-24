@@ -4,10 +4,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
 import datetime
 import json
-from Interfaces.graph_plotter import IGraphPlotter
 import io
+import re
 
-class GraphPlotter(IGraphPlotter):
+class GraphPlotter:
     def __init__(self, canvas, dao, user_id):
         self.canvas = canvas
         self.figure = plt.Figure()
@@ -20,34 +20,65 @@ class GraphPlotter(IGraphPlotter):
         if self.user_id is None:
             raise ValueError("User ID is None. Please ensure it is passed correctly.")
 
-    def plot_function(self, function: str, x_min: float, x_max: float):
+    def _prepare_function(self, function: str) -> str:
+        """Convert user-friendly mathematical functions to NumPy equivalents."""
+        # Replace common math functions with NumPy equivalents
+        replacements = {
+            r'\bsin\b': 'np.sin',
+            r'\bcos\b': 'np.cos',
+            r'\btan\b': 'np.tan',
+            r'\blog\b': 'np.log',
+            r'\bexp\b': 'np.exp',
+            r'\bsqrt\b': 'np.sqrt',
+            r'\^': '**',  # Replace caret with exponentiation
+            r'(\d)([a-zA-Z\(])': r'\1*\2'  # Implicit multiplication
+        }
+
+        for pattern, replacement in replacements.items():
+            function = re.sub(pattern, replacement, function)
+
+        return function
+
+    def plot_function(self, function: str, variable: str, x_min: float, x_max: float, function_type: str, units: str = None):
+        function = self._prepare_function(function)
         x = np.linspace(x_min, x_max, 400)
+        
+        # Handle trigonometric functions and units
+        if function_type == "Trigonometric" and units == "Degrees":
+            x = np.deg2rad(x)
+        
         try:
-            y = eval(function, {"np": np, "sin": np.sin, "cos": np.cos, "tan": np.tan, "exp": np.exp, "sqrt": np.sqrt, "log": np.log}, {"x": x})
+            y = eval(function, {"np": np, variable: x})
         except Exception as e:
-            print(f"Error in evaluating the function: {e}")
-            return
+            raise ValueError(f"Error in evaluating the function: {e}")
+        
         self.ax.clear()
         self.ax.plot(x, y)
-        self.ax.set_title(f"Plot of {function}")
+        self.ax.set_title(f"{function_type} Function: {function}")
+        self.ax.set_xlabel(variable)
+        self.ax.set_ylabel("y")
+        self.ax.grid(True)
+        self.plot_canvas.draw()
+        self.save_graph_data(function, x_min, x_max)
+
+    def plot_implicit(self, function: str, x_min: float, x_max: float, y_min: float, y_max: float):
+        function = self._prepare_function(function)
+        x = np.linspace(x_min, x_max, 400)
+        y = np.linspace(y_min, y_max, 400)
+        X, Y = np.meshgrid(x, y)
+
+        try:
+            Z = eval(function, {"np": np, "X": X, "Y": Y, "x": X, "y": Y})
+        except Exception as e:
+            raise ValueError(f"Error in evaluating the implicit function: {e}")
+        
+        self.ax.clear()
+        self.ax.contour(X, Y, Z, levels=[0], colors='black')
+        self.ax.set_title(f"Implicit Plot: {function}")
         self.ax.set_xlabel("x")
         self.ax.set_ylabel("y")
-        self.ax.grid(True, which='both')
-        self.ax.spines['left'].set_position('zero')
-        self.ax.spines['left'].set_color('black')
-        self.ax.spines['left'].set_linewidth(0.5)
-        self.ax.spines['bottom'].set_position('zero')
-        self.ax.spines['bottom'].set_color('black')
-        self.ax.spines['bottom'].set_linewidth(0.5)
-        self.ax.spines['right'].set_color('none')
-        self.ax.spines['top'].set_color('none')
-        self.ax.plot(1, 0, ">k", transform=self.ax.get_yaxis_transform(), clip_on=False)
-        self.ax.plot(0, 1, "^k", transform=self.ax.get_xaxis_transform(), clip_on=False)
-        self.ax.xaxis.set_ticks_position('bottom')
-        self.ax.yaxis.set_ticks_position('left')
+        self.ax.grid(True)
         self.plot_canvas.draw()
-
-        # Save the graph data
         self.save_graph_data(function, x_min, x_max)
 
     def save_graph_data(self, function: str, x_min: float, x_max: float):
@@ -65,44 +96,35 @@ class GraphPlotter(IGraphPlotter):
 
         # Save graph data in GRAPHICAL_FUNCTION table
         graph_entry = {
-            'user_id': self.user_id,  # Ensure user_id is included
+            'user_id': self.user_id,
             'function': function,
             'x_min': x_min,
             'x_max': x_max,
-            'timestamp': datetime.datetime.now().isoformat(),  # Use current timestamp
+            'timestamp': datetime.datetime.now().isoformat(),
             'image': image_data
         }
-        print(f"Inserting into GRAPHICAL_FUNCTION: {graph_entry}")
         graph_data_id = self.dao.insert('GRAPHICAL_FUNCTION', graph_entry)
 
         # Link to computation history
         history_entry = {
-            'user_id': self.user_id,  # Ensure user_id is included
+            'user_id': self.user_id,
             'expression': function,
             'result': 'Graph plotted',
             'computation_type': 'Graphical Function',
-            'timestamp': datetime.datetime.now().isoformat(),  # Ensure the timestamp is populated
+            'timestamp': datetime.datetime.now().isoformat(),
             'symbolic_steps': json.dumps(plot_settings),
             'graph_data_id': graph_data_id
         }
         self.dao.insert('COMPUTATION_HISTORY', history_entry)
 
-    def plot_parametric(self, x_func: str, y_func: str, t_min: float, t_max: float):
-        t = np.linspace(t_min, t_max, 400)
-        x = eval(x_func)
-        y = eval(y_func)
-        self.ax.clear()
-        self.ax.plot(x, y)
-        self.ax.set_title("Parametric Plot")
+    def zoom_in(self):
+        self.ax.set_xlim(self.ax.get_xlim()[0] / 1.5, self.ax.get_xlim()[1] / 1.5)
+        self.ax.set_ylim(self.ax.get_ylim()[0] / 1.5, self.ax.get_ylim()[1] / 1.5)
         self.plot_canvas.draw()
 
-    def plot_polar(self, r_func: str, theta_min: float, theta_max: float):
-        theta = np.linspace(theta_min, theta_max, 400)
-        r = eval(r_func)
-        self.ax.clear()
-        self.ax = self.figure.add_subplot(111, polar=True)
-        self.ax.plot(theta, r)
-        self.ax.set_title("Polar Plot")
+    def zoom_out(self):
+        self.ax.set_xlim(self.ax.get_xlim()[0] * 1.5, self.ax.get_xlim()[1] * 1.5)
+        self.ax.set_ylim(self.ax.get_ylim()[0] * 1.5, self.ax.get_ylim()[1] * 1.5)
         self.plot_canvas.draw()
 
     def plot_3d(self, z_func: str, x_min: float, x_max: float, y_min: float, y_max: float):
@@ -110,7 +132,12 @@ class GraphPlotter(IGraphPlotter):
         x = np.linspace(x_min, x_max, 100)
         y = np.linspace(y_min, y_max, 100)
         x, y = np.meshgrid(x, y)
-        z = eval(z_func)
+        z_func = self._prepare_function(z_func)
+        try:
+            z = eval(z_func, {"np": np, "x": x, "y": y})
+        except Exception as e:
+            print(f"Error in evaluating the 3D function: {e}")
+            return
         self.ax.clear()
         self.ax = self.figure.add_subplot(111, projection='3d')
         self.ax.plot_surface(x, y, z, cmap='viridis')

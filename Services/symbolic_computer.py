@@ -375,24 +375,24 @@ class SymbolicComputer:
         return solution, self.get_steps()
 
     def tangent_line(self, function: str, symbol: str, point: float):
-        self.clear_steps()
-        sym = sp.Symbol(symbol)
-        expr = sp.sympify(function)
-        slope = sp.diff(expr, sym).subs(sym, point)
-        self.add_step(f"Step 1: Differentiate the function to find the slope.\n"
-                      f"   - The derivative of {sp.pretty(expr)} with respect to {symbol} is {sp.pretty(sp.diff(expr, sym))}.\n"
-                      f"   - Evaluating this derivative at {symbol} = {point} gives the slope {sp.pretty(slope)}.\n")
-        y_intercept = expr.subs(sym, point) - slope * point
-        self.add_step(f"Step 2: Compute the y-intercept.\n"
-                      f"   - Substituting {symbol} = {point} into the original function gives {sp.pretty(expr.subs(sym, point))}.\n"
-                      f"   - The equation of the tangent line is y = {slope}*{symbol} + b.\n"
-                      f"   - Solving for the y-intercept b gives b = {sp.pretty(y_intercept)}.\n")
-        tangent = slope * sym + y_intercept
-        self.add_step(f"Step 3: Form the equation of the tangent line.\n"
-                      f"   - Therefore, the equation of the tangent line is y = {sp.pretty(tangent)}.\n")
-        self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
-        return tangent, self.get_steps()
-
+            self.clear_steps()
+            sym = sp.Symbol(symbol)
+            expr = sp.sympify(function)
+            slope = sp.diff(expr, sym).subs(sym, point)
+            self.add_step(f"Step 1: Differentiate the function to find the slope.\n"
+                        f"   - The derivative of {sp.pretty(expr)} with respect to {symbol} is {sp.pretty(sp.diff(expr, sym))}.\n"
+                        f"   - Evaluating this derivative at {symbol} = {point} gives the slope {sp.pretty(slope)}.\n")
+            y_intercept = expr.subs(sym, point) - slope * point
+            self.add_step(f"Step 2: Compute the y-intercept.\n"
+                        f"   - Substituting {symbol} = {point} into the original function gives {sp.pretty(expr.subs(sym, point))}.\n"
+                        f"   - The equation of the tangent line is y = {slope}*{symbol} + b.\n"
+                        f"   - Solving for the y-intercept b gives b = {sp.pretty(y_intercept)}.\n")
+            tangent = slope * sym + y_intercept
+            self.add_step(f"Step 3: Form the equation of the tangent line.\n"
+                        f"   - Therefore, the equation of the tangent line is y = {sp.pretty(tangent)}.\n")
+            self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
+            return tangent, self.get_steps()
+    
     def solve_exact_diff_eq(self, P, Q, x, y):
         self.clear_steps()
         dP_dy = sp.diff(P, y)

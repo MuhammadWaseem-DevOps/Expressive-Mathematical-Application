@@ -2,7 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import logging
 import datetime
-
+import numpy as np
+import matplotlib.pyplot as plt
 from tkinter.scrolledtext import ScrolledText
 from PIL import ImageGrab
 import pdfkit
@@ -208,12 +209,40 @@ class SymbolicComputation(ttk.Frame):
                 self.last_steps = steps
                 self.display_result(f"Tangent Line: {result}")
                 self.display_steps()
-                self.statusbar.config(text="Tangent line calculation completed successfully.")
+                self.plot_tangent(function.strip(), symbol.strip(), float(point.strip()), result)
+                self.statusbar.config(text="Tangent line calculation and graph completed successfully.")
                 self.save_computation_to_db(expression, result, steps, "tangent_line")  # Save to DB
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in tangent line calculation.")
         self.update_history()
+
+    def plot_tangent(self, function, symbol, point, tangent):
+        try:
+            sym = sp.Symbol(symbol)
+            func_expr = sp.sympify(function)
+            tangent_expr = sp.sympify(tangent)
+
+            func_lambda = sp.lambdify(sym, func_expr, "numpy")
+            tangent_lambda = sp.lambdify(sym, tangent_expr, "numpy")
+
+            x_vals = np.linspace(point - 10, point + 10, 400)
+            func_vals = func_lambda(x_vals)
+            tangent_vals = tangent_lambda(x_vals)
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(x_vals, func_vals, label=f'Function: {function}')
+            plt.plot(x_vals, tangent_vals, label=f'Tangent at {symbol} = {point}', linestyle='--')
+            plt.scatter([point], [func_lambda(point)], color='red', label=f'Point of Tangency ({point}, {func_lambda(point)})')
+
+            plt.title("Function and Tangent Line")
+            plt.xlabel(symbol)
+            plt.ylabel('y')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+        except Exception as e:
+            messagebox.showerror("Plotting Error", f"Failed to plot the graph: {e}")
 
     def solve_line(self):
         expression = self.input_text.get().strip()

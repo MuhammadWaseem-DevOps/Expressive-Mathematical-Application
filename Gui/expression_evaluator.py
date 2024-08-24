@@ -1,8 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
 from tkinter.scrolledtext import ScrolledText
+from PIL import Image, ImageTk
 
 class ExpressionInputFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -32,8 +31,9 @@ class ExpressionInputFrame(ttk.Frame):
         eval_button.grid(row=0, column=2, padx=10, pady=10)
 
         # Scrolled output frame to display the result and steps
-        self.output_text = ScrolledText(self, wrap='word', height=10, state='disabled', font=("Helvetica", 12))
+        self.output_text = ScrolledText(self, wrap='word', height=10, font=("Helvetica", 12))
         self.output_text.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.output_text.config(state='disabled')  # Initially disable the output area
 
         # Frame to display AST image
         self.tree_image_label = ttk.Label(self)
@@ -84,17 +84,29 @@ class ExpressionInputFrame(ttk.Frame):
 
     def clear_output(self):
         """Clear the output area."""
+        # Enable the text widget to allow clearing
         self.output_text.config(state='normal')
-        self.output_text.delete(1.0, tk.END)  # Clear the text widget
-        self.output_text.config(state='disabled')  # Re-disable the text widget after clearing
-        self.tree_image_label.config(image='')  # Clear the AST image
-        self.ast_image = None  # Reset the ast_image reference
+        
+        # Clear the text widget
+        self.output_text.delete('1.0', tk.END)
+        
+        # Disable the text widget after clearing
+        self.output_text.config(state='disabled')
+
+        # Clear the image
+        self.tree_image_label.config(image='')
+        self.ast_image = None
 
     def display_result(self, result_text):
         """Display the result in the output_text widget."""
-        self.output_text.config(state='normal')  # Enable the text widget for updates
+        # Enable the text widget
+        self.output_text.config(state='normal')
+        
+        # Insert the new result text
         self.output_text.insert(tk.END, result_text)
-        self.output_text.config(state='disabled')  # Lock the text widget again
+        
+        # Disable the text widget to prevent editing
+        self.output_text.config(state='disabled')
 
     def display_ast_image(self):
         """Display the AST image."""
@@ -176,3 +188,7 @@ class ExpressionInputFrame(ttk.Frame):
         """Clear both the input field and the output area."""
         self.expression_entry.delete(0, tk.END)  # Clear the input entry field
         self.clear_output()  # Clear the output area
+
+    def on_frame_show(self):
+        """Method to be called when the frame is shown to ensure fields are cleared."""
+        self.clear_all()
