@@ -5,8 +5,8 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from tkinter.scrolledtext import ScrolledText
-from PIL import ImageGrab
-import pdfkit
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 from Services.symbolic_computer import SymbolicComputer
 import sympy as sp
 
@@ -32,7 +32,7 @@ class SymbolicComputation(ttk.Frame):
         top_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
 
         input_frame = ttk.Frame(top_frame)
-        input_frame.pack(side=tk.LEFT, padx=10)
+        input_frame.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
 
         ttk.Label(input_frame, text="Enter a problem", font=("Helvetica", 14)).pack(anchor=tk.W)
 
@@ -77,9 +77,24 @@ class SymbolicComputation(ttk.Frame):
         self.step_tab = ScrolledText(tab_control, wrap=tk.WORD, state=tk.DISABLED)
         tab_control.add(self.step_tab, text="Steps")
 
+        # Create a new frame for the Undo, Redo, and Save buttons just above the status bar
+        bottom_button_frame = ttk.Frame(main_frame)
+        bottom_button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+
+        undo_button = ttk.Button(bottom_button_frame, text="Undo", command=self.undo)
+        undo_button.pack(side=tk.LEFT, padx=5)
+
+        redo_button = ttk.Button(bottom_button_frame, text="Redo", command=self.redo)
+        redo_button.pack(side=tk.LEFT, padx=5)
+
+        save_button = ttk.Button(bottom_button_frame, text="Save", command=self.save_solution)
+        save_button.pack(side=tk.LEFT, padx=5)
+
+
     def create_statusbar(self):
         self.statusbar = ttk.Label(self, text="Ready", relief=tk.SUNKEN, anchor=tk.W, padding="5")
         self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+
 
     def handle_dropdown_selection(self, event):
         selected = event.widget.get()
@@ -306,8 +321,14 @@ class SymbolicComputation(ttk.Frame):
             messagebox.showinfo("Info", "No steps available. Please perform a calculation first.")
 
     def undo(self):
+        current_input = self.input_text.get().strip()
+
         if self.history:
-            self.future.append(self.input_text.get().strip())
+            # Push the current input to the future stack only if it's not the same as the last history entry
+            if not self.future or self.future[-1] != current_input:
+                self.future.append(current_input)
+
+            # Pop the last input from history and set it to the input text
             last_input = self.history.pop()
             self.input_text.delete(0, tk.END)
             self.input_text.insert(0, last_input)
@@ -316,14 +337,21 @@ class SymbolicComputation(ttk.Frame):
             self.statusbar.config(text="Nothing to undo.")
 
     def redo(self):
+        current_input = self.input_text.get().strip()
+
         if self.future:
-            self.history.append(self.input_text.get().strip())
+            # Push the current input to the history stack only if it's not the same as the last future entry
+            if not self.history or self.history[-1] != current_input:
+                self.history.append(current_input)
+
+            # Pop the last input from the future stack and set it to the input text
             next_input = self.future.pop()
             self.input_text.delete(0, tk.END)
             self.input_text.insert(0, next_input)
             self.statusbar.config(text="Redo performed.")
         else:
             self.statusbar.config(text="Nothing to redo.")
+
 
     def save_solution(self):
         file_types = [("PDF files", "*.pdf"), ("PNG files", "*.png"), ("Text files", "*.txt")]
@@ -341,11 +369,29 @@ class SymbolicComputation(ttk.Frame):
 
     def save_as_pdf(self, file_path):
         try:
-            html = self.result_tab.get("1.0", tk.END)
-            pdfkit.from_string(html, file_path)
+            # Create a canvas for the PDF
+            c = canvas.Canvas(file_path, pagesize=letter)
+            width, height = letter
+
+            # Set font and starting position
+            c.setFont("Helvetica", 12)
+            textobject = c.beginText(40, height - 40)
+
+            # Get the content from the result tab
+            content = self.result_tab.get("1.0", tk.END)
+
+            # Add content to the PDF
+            for line in content.splitlines():
+                textobject.textLine(line)
+
+            c.drawText(textobject)
+            c.showPage()
+            c.save()
+
             self.statusbar.config(text=f"Solution saved as PDF: {file_path}")
         except Exception as e:
             messagebox.showerror("Save Solution", f"Error saving as PDF: {e}")
+
 
     def save_as_image(self, file_path):
         try:
