@@ -1,7 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
+from tkinter import messagebox, filedialog
 from PIL import Image, ImageTk
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 class ExpressionInputFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -22,7 +25,7 @@ class ExpressionInputFrame(ttk.Frame):
         header_frame.grid(row=0, column=0, columnspan=2, pady=(10, 20), sticky="ew")
         header_frame.grid_columnconfigure(1, weight=1)
         
-        ttk.Label(header_frame, text="Enter a problem", font=("Helvetica", 14), foreground="#2c3e50").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        ttk.Label(header_frame, text="Enter a mathematical expression:", font=("Helvetica", 14), foreground="#2c3e50").grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
         self.expression_entry = ttk.Entry(header_frame, font=("Helvetica", 14))
         self.expression_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
@@ -69,8 +72,9 @@ class ExpressionInputFrame(ttk.Frame):
             result, steps, ast_image = self.controller.evaluator.evaluate(expression)
 
             # Now update the text and image with the new evaluation result
-            result_text = f"Result: {result}\n\nSteps:\n{steps}"
-            self.display_result(result_text)
+            result_text = f"Result: {result}\n"
+            steps_text = "\n--------------------\nSteps:\n" + steps  # steps should include the detailed solution
+            self.display_result(result_text + steps_text)
 
             # Display the AST image
             self.ast_image = ast_image  # Save the original image for resizing

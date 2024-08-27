@@ -49,6 +49,9 @@ class DashboardFrame(ttk.Frame):
         self.recent_activities_tree.column("Time", anchor="center", width=100)
         self.recent_activities_tree.pack(fill=tk.BOTH, expand=True)
 
+        # Bind double-click event to the treeview to show activity details
+        self.recent_activities_tree.bind("<Double-1>", self.show_activity_details)
+
         self.load_recent_activities()
 
     def create_computation_statistics_section(self):
@@ -73,6 +76,7 @@ class DashboardFrame(ttk.Frame):
         self.saved_computations_tree.column("Result", anchor="center", width=300)
         self.saved_computations_tree.pack(fill=tk.BOTH, expand=True)
 
+        # Bind double-click event to the treeview to show computation details
         self.saved_computations_tree.bind("<Double-1>", self.show_computation_details)
 
         self.load_saved_computations()
@@ -102,8 +106,12 @@ class DashboardFrame(ttk.Frame):
     def load_recent_activities(self):
         self.recent_activities_tree.delete(*self.recent_activities_tree.get_children())
         recent_activities = self.get_recent_activities()
+
+        # Ensure activities are sorted by timestamp in descending order
+        recent_activities.sort(key=lambda x: x['timestamp'], reverse=True)
+
         for activity in recent_activities:
-            self.recent_activities_tree.insert("", tk.END, values=(activity['activity'], activity['result'], activity['time']))
+            self.recent_activities_tree.insert("", tk.END, iid=activity['id'], values=(activity['activity'], activity['result'], self.time_since(activity['timestamp'])))
 
     def load_saved_computations(self):
         self.saved_computations_tree.delete(*self.saved_computations_tree.get_children())
@@ -111,6 +119,25 @@ class DashboardFrame(ttk.Frame):
 
         for computation in saved_computations:
             self.saved_computations_tree.insert("", tk.END, iid=computation['history_id'], values=(computation['equation'], computation['result']))
+
+    def show_activity_details(self, event):
+        selected_item = self.recent_activities_tree.selection()
+        if not selected_item:
+            return
+
+        activity_id = selected_item[0]
+
+        try:
+            details = self.controller.profile_manager.get_computation_details(activity_id)
+        except Exception as e:
+            logging.error(f"Failed to load computation details: {e}")
+            return
+
+        if not details:
+            logging.error(f"No details found for activity_id: {activity_id}")
+            return
+
+        self.show_details_dialog(details)
 
     def show_computation_details(self, event):
         selected_item = self.saved_computations_tree.selection()
@@ -129,6 +156,9 @@ class DashboardFrame(ttk.Frame):
             logging.error(f"No details found for computation_id: {history_id}")
             return
 
+        self.show_details_dialog(details)
+
+    def show_details_dialog(self, details):
         detail_frame = tk.Toplevel(self)
         detail_frame.title("Computation Details")
 
@@ -143,8 +173,8 @@ class DashboardFrame(ttk.Frame):
         if not steps:
             ttk.Label(steps_frame, text="No steps available.", font=("Helvetica", 12)).pack(anchor="w")
         else:
-            for step in steps:
-                ttk.Label(steps_frame, text=step, font=("Helvetica", 12)).pack(anchor="w")
+            for i, step in enumerate(steps, start=1):
+                ttk.Label(steps_frame, text=f"Step {i}: {step}", font=("Helvetica", 12)).pack(anchor="w")
 
     def refresh_dashboard(self):
         self.load_recent_activities()
@@ -156,9 +186,10 @@ class DashboardFrame(ttk.Frame):
         for entry in activities:
             try:
                 activity = {
+                    "id": entry[0],
                     "activity": entry[2],
                     "result": entry[3],
-                    "time": self.time_since(entry[4])
+                    "timestamp": entry[4]
                 }
                 recent_activities.append(activity)
             except ValueError as e:
