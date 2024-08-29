@@ -41,14 +41,20 @@ class ExpressionEvaluator:
         self._history_saved = False  # Flag to track if history is saved
 
     def evaluate(self, expression: str):
+        # Reset the solver state for a new evaluation
         self._history_saved = False
+        self.solver.clear_steps()  # Reset the steps in the solver
         self.solver.log_expression(expression)
+        
         parser = self.Parser(expression, self)
         ast = parser.parse()
         self.solver.log_ast_generation(ast)
         result = self._evaluate_ast(ast)
         steps = self.solver.get_detailed_steps()
+        
+        # Save the result and steps to the history for this specific evaluation
         self.save_to_history(expression, result, steps)
+        
         ast_image = parser.draw_ast(ast)
         self.solver.log_final_result(result)
         return result, steps, ast_image
@@ -415,17 +421,26 @@ class ExpressionEvaluator:
                     output.append(node)
                     self.graph.add_node(id(node), label=token)
                 elif token in self.evaluator.functions:
-                    operators.append(token)
-                elif token.isdigit() or token.replace('.', '', 1).isdigit():
-                    node = ExpressionEvaluator.ASTNode(token)
-                    output.append(node)
-                    self.graph.add_node(id(node), label=token)
+                    operators.append(token)  # Push the function onto the operators stack
                 elif token == '(':
                     operators.append(token)
                 elif token == ')':
                     while operators and operators[-1] != '(':
                         apply_operator()
                     operators.pop()  # Pop the '('
+                    if operators and operators[-1] in self.evaluator.functions:
+                        # If the top of the stack is a function, treat it as such
+                        func = operators.pop()
+                        arg = output.pop()
+                        func_node = ExpressionEvaluator.ASTNode(func, None, arg)
+                        output.append(func_node)
+                        self.graph.add_node(id(func_node), label=func)
+                        self.graph.add_edge(id(func_node), id(arg))
+                        self.evaluator.solver.log_ast_construction(func_node)
+                elif token.isdigit() or token.replace('.', '', 1).isdigit():
+                    node = ExpressionEvaluator.ASTNode(token)
+                    output.append(node)
+                    self.graph.add_node(id(node), label=token)
                 elif token in precedence:
                     while (operators and operators[-1] != '(' and
                         (precedence[operators[-1]] > precedence[token] or
@@ -511,6 +526,11 @@ class ExpressionEvaluator:
 # Step-by-Step Solver to track each step of the evaluation process
 class StepByStepSolver:
     def __init__(self):
+        self.steps = []
+        self.ast_construction_logs = []
+
+    def clear_steps(self):
+        """Clear the steps and logs for a fresh evaluation."""
         self.steps = []
         self.ast_construction_logs = []
 

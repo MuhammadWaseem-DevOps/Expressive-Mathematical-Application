@@ -60,7 +60,10 @@ class ExpressionInputFrame(ttk.Frame):
 
     def evaluate_expression(self):
         """Evaluate the mathematical expression provided by the user and display the result."""
-        self.clear_output()  # Clear previous output first
+        print("Evaluating new expression...")
+
+        # Clear previous output first
+        self.clear_output()
 
         expression = self.expression_entry.get()
         if not expression:
@@ -71,6 +74,8 @@ class ExpressionInputFrame(ttk.Frame):
             # Assuming controller has an evaluator instance
             result, steps, ast_image = self.controller.evaluator.evaluate(expression)
 
+            print("Inserting new result and steps into output text.")
+            
             # Now update the text and image with the new evaluation result
             result_text = f"Result: {result}\n"
             steps_text = "\n--------------------\nSteps:\n" + steps  # steps should include the detailed solution
@@ -88,27 +93,40 @@ class ExpressionInputFrame(ttk.Frame):
 
     def clear_output(self):
         """Clear the output area."""
+        print("Clearing output text...")
+
         # Enable the text widget to allow clearing
         self.output_text.config(state='normal')
         
         # Clear the text widget
         self.output_text.delete('1.0', tk.END)
         
-        # Disable the text widget after clearing
-        self.output_text.config(state='disabled')
-
+        # Debugging print to confirm it clears correctly
+        current_content = self.output_text.get('1.0', tk.END).strip()
+        if not current_content:
+            print("Output area fully cleared.")
+        else:
+            print("Warning: Output area not cleared correctly, content still present.")
+        
         # Clear the image
         self.tree_image_label.config(image='')
         self.ast_image = None
+        self.tree_image_label.update_idletasks()  # Force update to ensure image label is cleared
 
     def display_result(self, result_text):
         """Display the result in the output_text widget."""
-        # Enable the text widget
+        print("Displaying result...")
+
+        # Ensure the text widget is enabled
         self.output_text.config(state='normal')
-        
+
         # Insert the new result text
         self.output_text.insert(tk.END, result_text)
-        
+
+        # Debugging print to confirm insertion
+        current_content = self.output_text.get('1.0', tk.END).strip()
+        print("Current content in output area after insertion:\n", current_content)
+
         # Disable the text widget to prevent editing
         self.output_text.config(state='disabled')
 

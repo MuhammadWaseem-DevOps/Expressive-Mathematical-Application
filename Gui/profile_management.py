@@ -6,6 +6,7 @@ import io
 import json
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from tkinter.scrolledtext import ScrolledText  # Import ScrolledText
 
 class ProfileManagement(ttk.Frame):
     def __init__(self, parent, controller):
@@ -320,8 +321,14 @@ class ProfileManagement(ttk.Frame):
         if not steps:
             ttk.Label(steps_frame, text="No steps available.", font=("Helvetica", 12)).pack(anchor="w")
         else:
-            for step in steps:
-                ttk.Label(steps_frame, text=step, font=("Helvetica", 12)).pack(anchor="w")
+            # Convert steps from the database (which is stored as a single string) to a proper multiline string
+            formatted_steps = steps.replace("\\n", "\n").replace("\\r", "")
+            
+            # Use ScrolledText to display the steps
+            steps_text = ScrolledText(steps_frame, wrap="word", font=("Helvetica", 12))
+            steps_text.pack(fill="both", expand=True)
+            steps_text.insert("1.0", formatted_steps)
+            steps_text.config(state="disabled")  # Make text read-only
 
         # Check if there is graph data and display it
         if 'graph_data' in details:
@@ -353,3 +360,7 @@ class ProfileManagement(ttk.Frame):
             canvas = FigureCanvasTkAgg(figure, master=numerical_graph_frame)
             canvas.draw()
             canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    def display_error_popup(self, message):
+        """Display an error message in a popup dialog."""
+        messagebox.showerror("Error", message)

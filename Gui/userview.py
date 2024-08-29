@@ -214,7 +214,14 @@ class TkinterGUI(ThemedTk):
             return False
         return True
 
-    def login(self, username, password):
+    def login(self, username=None, password=None):
+        # Fetch username and password from the entry fields if not provided
+        if username is None or password is None:
+            login_frame = self.frames.get("Login Interface")
+            if login_frame:
+                username = login_frame.username_entry.get()
+                password = login_frame.password_entry.get()
+
         logging.debug("Attempting login")
         if self.auth_service.authenticate_user(username, password):
             self.initialize_after_login()  # Initialize components after login
@@ -240,8 +247,14 @@ class TkinterGUI(ThemedTk):
         self.auth_service.logout()
         self.sidebar.grid_remove()  # Hide the sidebar on logout
         self.toggle_button.grid_remove()  # Hide the toggle button on logout
-        self.frames["Login Interface"].login_button.configure(text="Login", command=self.login)
+        
+        # Ensure the login button is reset correctly
+        login_frame = self.frames.get("Login Interface")
+        if login_frame:
+            login_frame.login_button.configure(text="Login", command=self.login)
+        
         self.showLoginScreen()
+
 
     def displayResult(self, result):
         """Display a success result message."""

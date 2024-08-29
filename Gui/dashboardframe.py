@@ -3,6 +3,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps, ImageDraw
 import datetime
 import io
+import os
 import logging
 
 class DashboardFrame(ttk.Frame):
@@ -86,14 +87,18 @@ class DashboardFrame(ttk.Frame):
         return profile_data["full_name"] if profile_data and profile_data.get("full_name") else "User"
 
     def get_profile_image(self):
-        profile_data = self.controller.profile_manager.getProfile(self.user_id)
-        if profile_data and profile_data.get("profile_picture"):
-            image_data = profile_data["profile_picture"]
-            image = Image.open(io.BytesIO(image_data))
-            image = self._resize_and_crop_image(image, size=(100, 100))
-            return ImageTk.PhotoImage(image)
-        else:
-            return ImageTk.PhotoImage(Image.open("default_profile.png"))
+        user_image_path = f"E:\\PROJECTS\\DessertationVersion1\\Expressive Mathematical Application\\user_images\\{self.controller.auth_service.get_current_user_id()}.png"
+        
+        if os.path.exists(user_image_path):
+            try:
+                image = Image.open(user_image_path)
+                image = image.resize((100, 100), Image.ANTIALIAS)
+                return ImageTk.PhotoImage(image)
+            except Exception as e:
+                print(f"Error loading user profile image: {e}")
+        
+        # If the image does not exist, create a blank image or a simple placeholder
+        return ImageTk.PhotoImage(Image.new('RGB', (100, 100), color='gray'))
 
     def _resize_and_crop_image(self, image, size=(100, 100)):
         image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
