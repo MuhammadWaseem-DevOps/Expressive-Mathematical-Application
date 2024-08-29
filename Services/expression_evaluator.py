@@ -31,7 +31,7 @@ class ExpressionEvaluator:
             'Polynomial': Polynomial,
             'ComplexNumber': ComplexNumber,
             'Matrix': Matrix,
-            'RationalExpression': RationalExpression,
+            'Vector': Vector,
             'InequalityExpression': InequalityExpression,
             'PiecewiseExpression': PiecewiseExpression
         }
@@ -41,23 +41,14 @@ class ExpressionEvaluator:
         self._history_saved = False  # Flag to track if history is saved
 
     def evaluate(self, expression: str):
-        # Reset the history saved flag before each evaluation
         self._history_saved = False
-
         self.solver.log_expression(expression)
-        
-        # Parse and evaluate
-        parser = self.Parser(expression, self)  # Passing self as the evaluator
+        parser = self.Parser(expression, self)
         ast = parser.parse()
         self.solver.log_ast_generation(ast)
-        
         result = self._evaluate_ast(ast)
         steps = self.solver.get_detailed_steps()
-
-        # Save the result and steps to the computation history
         self.save_to_history(expression, result, steps)
-
-        # Generate and display the AST
         ast_image = parser.draw_ast(ast)
         self.solver.log_final_result(result)
         return result, steps, ast_image
@@ -66,44 +57,53 @@ class ExpressionEvaluator:
         if node is None:
             raise ValueError("Attempted to evaluate a None node. Check the AST construction for issues.")
 
-        # If the node is a leaf node
         if node.left is None and node.right is None:
-            value = None
-            if isinstance(node.value, str) and node.value.replace('.', '', 1).isdigit():
-                # Handle numeric values
-                value = float(node.value)
-                self.solver.log_leaf_node(node.value, value)
-            elif node.value in self.variables:
-                # Handle variables
-                value = self.variables[node.value]
-                self.solver.log_variable(node.value, value)
-            elif node.value in self.constants:
-                # Handle constants
-                value = self.constants[node.value]
-                self.solver.log_constant(node.value, value)
-            elif node.value in self.functions:
-                # Handle functions (returning function reference)
-                return self.functions[node.value]
-            elif isinstance(node.value, Polynomial):
-                # Handle Polynomial objects
-                value = node.value
-            elif isinstance(node.value, (int, float)):
-                # Handle integer or float values directly
-                value = node.value
+            # Handling constants, variables, and functions
+            if isinstance(node.value, str):
+                if node.value in self.constants:
+                    value = self.constants[node.value]
+                    self.solver.log_constant(node.value, value)
+                    return value
+                elif node.value in self.variables:
+                    value = self.variables[node.value]
+                    self.solver.log_variable(node.value, value)
+                    return value
+                elif node.value in self.functions:
+                    # Here, we expect node.value to be a function name, so let's handle this case.
+                    func = self.functions[node.value]
+                    if callable(func):
+                        self.solver.log_function(node.value, func)
+                        return func
+                    else:
+                        raise ValueError(f"Expected a callable function for {node.value}, but got {type(func)}.")
+                elif node.value.replace('.', '', 1).isdigit():
+                    value = float(node.value)
+                    self.solver.log_leaf_node(node.value, value)
+                    return value
+                else:
+                    raise ValueError(f"Unrecognized token: {node.value}")
             else:
-                # Handle object instantiation (like Polynomial)
-                value = self._instantiate_object(node.value)
-            return value
+                return node.value
 
-        # If the node represents a function call
         if node.value in self.functions:
             func = self.functions[node.value]
-            arg = self._evaluate_ast(node.right)
-            result = func(arg) if node.value == 'not' else func(self._evaluate_ast(node.left), arg)
-            self.solver.log_operation(node.value, None, arg, result, node)
-            return result
+            if callable(func):
+                # For unary functions (like 'sqrt', 'sin', 'cos', etc.)
+                if node.right is not None:
+                    arg = self._evaluate_ast(node.right)
+                    result = func(arg)
+                    self.solver.log_operation(node.value, None, arg, result, node)
+                    return result
+                elif node.left is not None:
+                    arg = self._evaluate_ast(node.left)
+                    result = func(arg)
+                    self.solver.log_operation(node.value, arg, None, result, node)
+                    return result
+                else:
+                    raise ValueError(f"Function '{node.value}' requires an argument but none was provided.")
+            else:
+                raise ValueError(f"Expected a callable function for {node.value}, but got {type(func)}.")
 
-        # If the node represents an operator
         left_val = self._evaluate_ast(node.left) if node.left else None
         right_val = self._evaluate_ast(node.right) if node.right else None
 
@@ -115,19 +115,39 @@ class ExpressionEvaluator:
             self.solver.log_assignment(node.left.value, right_val)
             return right_val
 
-        # Evaluate the operation (including for Polynomial objects)
         result = self._apply_operator(node.value, left_val, right_val, node)
         return result
-
 
     def _instantiate_object(self, expression):
         try:
             class_name, params = expression.split('(', 1)
             params = params.rstrip(')')
+
             if class_name in self.object_classes:
-                params_list = self._parse_parameters(params)
-                obj = self.object_classes[class_name](*params_list)
-                self.solver.log_instantiation(class_name, params_list, obj)
+                if class_name == 'Polynomial':
+                    coefficients = eval(params)
+                    obj = Polynomial(coefficients)
+                elif class_name == 'Matrix':
+                    params_list = [self._parse_matrix_parameters(params)]
+                    obj = self.object_classes[class_name](*params_list)
+                elif class_name == 'Vector':
+                    params_list = [self._parse_vector_parameters(params)]
+                    obj = self.object_classes[class_name](*params_list)
+                elif class_name == 'InequalityExpression':
+                    params_list = self._parse_inequality_expression_parameters(params)
+                    obj = self.object_classes[class_name](*params_list)
+                elif class_name == 'PiecewiseExpression':
+                    params_list = self._parse_piecewise_expression_parameters(params)
+                    obj = self.object_classes[class_name](*params_list)
+                elif class_name == 'ComplexNumber':
+                    # Properly parsing ComplexNumber parameters
+                    real_part, imag_part = self._parse_complex_parameters(params)
+                    obj = self.object_classes[class_name](real_part, imag_part)
+                else:
+                    params_list = self._parse_parameters(params)
+                    obj = self.object_classes[class_name](*params_list)
+
+                self.solver.log_instantiation(class_name, params, obj)
                 return obj
             elif class_name in self.constants:
                 return self.constants[class_name]
@@ -135,6 +155,53 @@ class ExpressionEvaluator:
                 raise ValueError(f"Unknown class or constant: {class_name}")
         except Exception as e:
             raise ValueError(f"Failed to instantiate object: {str(e)}")
+
+    def _parse_complex_parameters(self, params):
+        try:
+            # Remove any surrounding whitespace and split the string by comma
+            param_list = params.split(',')
+            if len(param_list) != 2:
+                raise ValueError(f"ComplexNumber requires exactly 2 parameters, got {len(param_list)}")
+
+            # Convert the split strings into floats
+            real_part = float(param_list[0].strip())
+            imag_part = float(param_list[1].strip())
+            return real_part, imag_part
+        except ValueError as ve:
+            raise ValueError(f"Error parsing ComplexNumber parameters: {ve}")
+
+    def _parse_vector_parameters(self, params):
+        vector_str = params.strip()
+        vector = eval(vector_str)
+        if not isinstance(vector, list):
+            raise ValueError(f"Invalid vector format: {params}")
+        return vector
+
+    def _parse_matrix_parameters(self, params):
+        matrix_str = params.strip()
+        matrix = eval(matrix_str)
+        if not isinstance(matrix, list) or not all(isinstance(row, list) for row in matrix):
+            raise ValueError(f"Invalid matrix format: {params}")
+        return matrix
+
+    def _parse_inequality_expression_parameters(self, params):
+        parts = params.split(',')
+        left_expr = parts[0].strip()
+        operator = parts[1].strip().strip('"')
+        right_expr = parts[2].strip().strip('"')
+        return [left_expr, operator, right_expr]
+
+    def _parse_piecewise_expression_parameters(self, params):
+        parts = params.split('],[')
+        conditions = [x.strip().strip('"') for x in parts[0].lstrip('[').split(',')]
+        expressions = [x.strip().strip('"') for x in parts[1].rstrip(']').split(',')]
+        return [conditions, expressions]
+
+    def _parse_piecewise_params(self, params):
+        conditions_part, expressions_part = params.split('],[')
+        conditions = json.loads(conditions_part + ']')
+        expressions = json.loads('[' + expressions_part)
+        return conditions, expressions
 
     def _parse_parameters(self, params):
         if not params:
@@ -162,10 +229,12 @@ class ExpressionEvaluator:
 
     def _apply_operator(self, operator, left_val, right_val, node):
         try:
-            result = None
+            if left_val is None or right_val is None:
+                raise ValueError(f"Failed to evaluate operator '{operator}' because one of the operands is None. Left: {left_val}, Right: {right_val}")
 
-            # Handle Polynomial operations
+            result = None
             if isinstance(left_val, Polynomial) or isinstance(right_val, Polynomial):
+                # Polynomial operations
                 if operator == '+':
                     result = left_val + right_val
                 elif operator == '-':
@@ -176,21 +245,73 @@ class ExpressionEvaluator:
                     result = left_val.long_division(right_val)
                 else:
                     raise ValueError(f"Unsupported polynomial operator: {operator}")
-
-                # Log the polynomial operation
                 self.solver.log_operation(operator, left_val, right_val, result, node)
-
-                # Prepare details for logging step-by-step explanation
                 details = {
                     'left_coefficients': left_val.coefficients,
                     'right_coefficients': right_val.coefficients,
                     'result_coefficients': result.coefficients if isinstance(result, Polynomial) else result[0].coefficients
                 }
                 self.solver.log_steps_for_expression("Polynomial", details)
-
+                return result
+            elif isinstance(left_val, ComplexNumber) or isinstance(right_val, ComplexNumber):
+                # Complex number operations
+                if operator == '+':
+                    result = left_val + right_val
+                elif operator == '-':
+                    result = left_val - right_val
+                elif operator == '*':
+                    result = left_val * right_val
+                elif operator == '/':
+                    result = left_val / right_val
+                else:
+                    raise ValueError(f"Unsupported complex number operator: {operator}")
+                self.solver.log_operation(operator, left_val, right_val, result, node)
+                details = {
+                    'left_complex': left_val,
+                    'right_complex': right_val,
+                    'operation': operator,
+                    'result': result
+                }
+                self.solver.log_steps_for_expression("ComplexNumber", details)
+                return result
+            elif isinstance(left_val, Matrix) or isinstance(right_val, Matrix):
+                # Matrix operations
+                if operator == '+':
+                    result = left_val + right_val
+                elif operator == '-':
+                    result = left_val - right_val
+                elif operator == '*':
+                    result = left_val * right_val
+                else:
+                    raise ValueError(f"Unsupported matrix operator: {operator}")
+                self.solver.log_operation(operator, left_val, right_val, result, node)
+                return result
+            elif isinstance(left_val, Vector) or isinstance(right_val, Vector):
+                # Vector operations
+                if operator == '+':
+                    result = left_val + right_val
+                elif operator == '-':
+                    result = left_val - right_val
+                elif operator == '.':
+                    result = left_val.dot(right_val)  # Dot product
+                elif operator == 'x':
+                    result = left_val.cross(right_val)  # Cross product
+                else:
+                    raise ValueError(f"Unsupported vector operator: {operator}")
+                self.solver.log_operation(operator, left_val, right_val, result, node)
+                details = {
+                    'left_vector': left_val.components,
+                    'right_vector': right_val.components,
+                    'operation': operator,
+                    'result': result
+                }
+                self.solver.log_steps_for_expression("Vector", details)
+                return result
+            elif isinstance(left_val, InequalityExpression) or isinstance(right_val, InequalityExpression):
+                result = left_val.solve()
+                self.solver.log_operation(operator, left_val, right_val, result, node)
                 return result
 
-            # Handle standard operators
             if operator == '+':
                 result = left_val + right_val
             elif operator == '-':
@@ -219,27 +340,23 @@ class ExpressionEvaluator:
                 result = eval(f'{left_val} {operator} {right_val}')
             else:
                 raise ValueError(f"Unknown operator: {operator}")
-
-            # Log the standard operation
             self.solver.log_operation(operator, left_val, right_val, result, node)
-
             return result
         except Exception as e:
             raise ValueError(f"Failed to apply operator: {str(e)}")
 
     def save_to_history(self, expression, result, steps):
-        """Save the evaluation result and steps to the computation history."""
         if not self._history_saved:
             entry = {
                 'user_id': self.user_id,
                 'expression': expression,
                 'result': str(result),
                 'computation_type': 'Expression Evaluation',
-                'timestamp': datetime.datetime.now().isoformat(),  # Add the timestamp here
-                'symbolic_steps': json.dumps(steps)  # Convert steps to JSON format
+                'timestamp': datetime.datetime.now().isoformat(),
+                'symbolic_steps': json.dumps(steps)
             }
             self.dao.insert('COMPUTATION_HISTORY', entry)
-            self._history_saved = True  # Mark as saved to prevent duplicates
+            self._history_saved = True
 
     class Parser:
         def __init__(self, expression, evaluator):
@@ -250,9 +367,12 @@ class ExpressionEvaluator:
             self.graph = nx.DiGraph()
 
         def tokenize(self, expression):
-            # Updated regex pattern to include polynomial recognition
-            token_pattern = re.compile(r'Polynomial\(\[.*?\]\)|\d+\.?\d*|[a-zA-Z_]\w*|[()+\-*/^=<>!&|]')
-            return token_pattern.findall(expression)
+            token_pattern = re.compile(
+                r'Polynomial\(\[.*?\]\)|Matrix\(\[\[.*?\]\]\)|Vector\(\[.*?\]\)|InequalityExpression\(".*?","\w+",".*?"\)|'
+                r'PiecewiseExpression\(\[.*?\],\[.*?\]\)|ComplexNumber\([ \d.,-]+\)|\d+\.?\d*|[a-zA-Z_]\w*|[()+\-*/^=<>!&|]')
+            tokens = token_pattern.findall(expression)
+            self.evaluator.solver.log_tokenization(tokens)
+            return tokens
 
         def parse(self):
             ast = self.expression_to_ast()
@@ -261,7 +381,6 @@ class ExpressionEvaluator:
         def expression_to_ast(self):
             output = deque()
             operators = deque()
-
             precedence = {'+': 1, '-': 1, '*': 2, '/': 2, '^': 3, '**': 3, '=': 0, 'and': 0, 'or': 0, 'not': 0, '>': 0, '<': 0, '>=': 0, '<=': 0}
             associativity = {'+': 'L', '-': 'L', '*': 'L', '/': 'L', '^': 'R', '**': 'R'}
 
@@ -270,58 +389,51 @@ class ExpressionEvaluator:
                 right = output.pop() if output else None
                 left = output.pop() if output else None
 
-                if right is None or left is None:
-                    print(f"Warning: Operator '{operator}' has a None operand. Left: {left}, Right: {right}")
+                if operator in ('+', '-', '*', '/', '^', '**') and (left is None or right is None):
+                    raise ValueError(f"Operator '{operator}' requires two operands, but got: Left: {left}, Right: {right}")
 
-                if operator in self.evaluator.functions:
-                    node = ExpressionEvaluator.ASTNode(operator, None, right)
-                    output.append(node)
-                    self.graph.add_node(id(node), label=operator)
-                    if right:
-                        self.graph.add_edge(id(node), id(right))
-                else:
-                    node = ExpressionEvaluator.ASTNode(operator, left, right)
-                    output.append(node)
-                    self.graph.add_node(id(node), label=operator)
-                    if left:
-                        self.graph.add_edge(id(node), id(left))
-                    if right:
-                        self.graph.add_edge(id(node), id(right))
+                node = ExpressionEvaluator.ASTNode(operator, left, right)
+                output.append(node)
+                self.graph.add_node(id(node), label=operator)
+                if left:
+                    self.graph.add_edge(id(node), id(left))
+                if right:
+                    self.graph.add_edge(id(node), id(right))
+                self.evaluator.solver.log_ast_construction(node)
 
             while self.pos < len(self.tokens):
                 token = self.tokens[self.pos]
 
-                if token.startswith('Polynomial'):
-                    # Handle polynomial tokens separately
-                    node = self._parse_polynomial(token)
+                if token.startswith('Polynomial') or token.startswith('Matrix') or token.startswith('Vector') or token.startswith('InequalityExpression') or token.startswith('PiecewiseExpression') or token.startswith('ComplexNumber'):
+                    node = self.evaluator._instantiate_object(token)
+                    ast_node = ExpressionEvaluator.ASTNode(node)
+                    output.append(ast_node)
+                    self.graph.add_node(id(ast_node), label=str(node))
+                elif token in self.evaluator.constants:
+                    value = self.evaluator.constants[token]
+                    node = ExpressionEvaluator.ASTNode(value)
                     output.append(node)
-                    self.evaluator.solver.log_polynomial_token(token, node)
-                elif token.isnumeric() or token.replace('.', '', 1).isdigit() or token in self.evaluator.constants:
+                    self.graph.add_node(id(node), label=token)
+                elif token in self.evaluator.functions:
+                    operators.append(token)
+                elif token.isdigit() or token.replace('.', '', 1).isdigit():
                     node = ExpressionEvaluator.ASTNode(token)
                     output.append(node)
                     self.graph.add_node(id(node), label=token)
-                    self.evaluator.solver.log_numeric_token(token, node)
-                elif token in self.evaluator.functions:
-                    operators.append(token)
-                    self.evaluator.solver.log_operator_token(token, list(operators))
                 elif token == '(':
                     operators.append(token)
-                    self.evaluator.solver.log_left_parenthesis(list(operators))
                 elif token == ')':
                     while operators and operators[-1] != '(':
                         apply_operator()
-                    operators.pop()  # Remove the '('
-                    if operators and operators[-1] in self.evaluator.functions:
-                        apply_operator()
-                    self.evaluator.solver.log_right_parenthesis(list(operators))
+                    operators.pop()  # Pop the '('
                 elif token in precedence:
                     while (operators and operators[-1] != '(' and
                         (precedence[operators[-1]] > precedence[token] or
                             (precedence[operators[-1]] == precedence[token] and associativity[token] == 'L'))):
                         apply_operator()
                     operators.append(token)
-                    self.evaluator.solver.log_operator_token(token, list(operators))
 
+                self.evaluator.solver.log_stack_operation("Processed", token, list(output), list(operators))
                 self.pos += 1
 
             while operators:
@@ -330,28 +442,57 @@ class ExpressionEvaluator:
             if not output:
                 raise ValueError("AST construction failed; no output generated.")
 
-            self.evaluator.solver.log_ast_structure(output[-1])
-            return output.pop()
+            final_ast = output.pop()
+            self.evaluator.solver.log_ast_construction(final_ast)
+            return final_ast
 
-        def _parse_polynomial(self, token):
-            # Extract the coefficients from the polynomial string
-            coefficients_str = token[token.find('[') + 1:token.rfind(']')]
-            coefficients = [float(c.strip()) for c in coefficients_str.split(',')]
-            polynomial_obj = Polynomial(coefficients)
-            node = ExpressionEvaluator.ASTNode(polynomial_obj)
-            node.coefficients = coefficients
-            self.graph.add_node(id(node), label=f"Polynomial({coefficients})")
-            return node
 
         def draw_ast(self, ast_node):
-            """Draw the AST using matplotlib and return the image."""
-            pos = nx.shell_layout(self.graph)  # Use shell_layout for better circular layout
+            def set_positions(node, x=0, y=0, positions=None, level=0, width_scale=10):
+                if positions is None:
+                    positions = {}
+
+                if node is not None:
+                    # Assign the position for the current node
+                    positions[id(node)] = (x, y)
+
+                    # Increase the vertical distance between nodes to avoid overlap
+                    vertical_offset = 1.5  # Adjust this value to reduce overlap
+
+                    # Calculate positions for the left and right children
+                    if node.left:
+                        set_positions(node.left, x - width_scale / (2 ** (level + 1)), y - vertical_offset, positions, level + 1, width_scale)
+                    if node.right:
+                        set_positions(node.right, x + width_scale / (2 ** (level + 1)), y - vertical_offset, positions, level + 1, width_scale)
+
+                return positions
+
+            # Generate positions for each node in the AST
+            positions = set_positions(ast_node, width_scale=10)
+
+            # Ensure every node in the graph has a position
+            for node_id in self.graph.nodes:
+                if node_id not in positions:
+                    positions[node_id] = (0, 0)  # Assign a default position
+
+            # Adjust node labels for readability
             labels = nx.get_node_attributes(self.graph, 'label')
 
-            plt.figure(figsize=(10, 10))
-            nx.draw(self.graph, pos, labels=labels, with_labels=True, arrows=False, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold")
-            plt.title("Abstract Syntax Tree")
+            # Initialize the plot with a larger figure size for clarity
+            plt.figure(figsize=(14, 10))
 
+            # Estimate the appropriate node size based on label length
+            node_sizes = []
+            for node_id, label in labels.items():
+                estimated_length = len(label) * 1000  # Adjust multiplier as needed for better fitting
+                node_sizes.append(estimated_length)
+
+            # Draw the graph with manually set positions and calculated node sizes
+            nx.draw(self.graph, pos=positions, labels=labels, with_labels=True,
+                    arrows=False, node_size=node_sizes, node_color="lightblue", font_size=10, font_weight="bold")
+
+            plt.title("Abstract Syntax Tree")
+            plt.axis('off')  # Turn off the axis for a cleaner look
             buf = BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
@@ -371,13 +512,14 @@ class ExpressionEvaluator:
 class StepByStepSolver:
     def __init__(self):
         self.steps = []
+        self.ast_construction_logs = []
 
     def log_expression(self, expression):
         self.steps.append(f"Input Expression:\nThe expression given is: {expression}\n")
 
     def log_tokenization(self, tokens):
-        numbers = [token for token in tokens if token.isdigit()]
-        operators = [token for token in tokens if not token.isdigit() and token not in '()']
+        numbers = [token for token in tokens if token.replace('.', '', 1).isdigit()]
+        operators = [token for token in tokens if token in '+-*/^=<>!&|']
         parentheses = [token for token in tokens if token in '()']
         self.steps.append(f"Tokenization:\nThe expression is broken down into the following components:\n"
                           f"Numbers: {', '.join(numbers)}\n"
@@ -387,35 +529,11 @@ class StepByStepSolver:
     def log_ast_generation(self, ast):
         self.steps.append("Building the Expression Tree:\n")
 
-    def log_numeric_token(self, token, node):
-        self.steps.append(f"Inserting numeric token '{token}' as a leaf node.\n")
-
-    def log_polynomial_token(self, token, node):
-        self.steps.append(f"Inserting polynomial '{token}' as a node with coefficients {node.coefficients}.\n")
-
-    def log_identifier_token(self, token, node):
-        self.steps.append(f"Inserting identifier token '{token}' as a leaf node.\n")
-
-    def log_operator_token(self, token, operators):
-        self.steps.append(f"Inserting operator token '{token}' into the operator stack. Stack now: {operators}\n")
-
-    def log_left_parenthesis(self, operators):
-        self.steps.append(f"Left parenthesis found. Stack now: {operators}\n")
-
-    def log_right_parenthesis(self, operators):
-        self.steps.append(f"Right parenthesis found. Resolving operations in the stack. Stack now: {operators}\n")
-
-    def log_operator_application(self, operator, node):
-        self.steps.append(f"Creating a new subtree with operator '{operator}' as the root node.\n"
-                          f"  - Left child: {node.left.value}\n"
-                          f"  - Right child: {node.right.value}\n")
-
-    def log_ast_structure(self, node):
+    def log_ast_construction(self, node):
         structure = self._format_ast(node)
-        self.steps.append(f"Constructed AST:\n{structure}\n")
+        self.ast_construction_logs.append(f"AST Node '{node.value}' with structure:\n{structure}\n")
 
     def _format_ast(self, node, level=0):
-        """Recursively format the AST structure."""
         if node is None:
             return ""
         result = f"{'  ' * level}Node '{node.value}'\n"
@@ -424,6 +542,11 @@ class StepByStepSolver:
         if node.right:
             result += f"{'  ' * (level + 1)}Right child of '{node.value}':\n{self._format_ast(node.right, level + 2)}"
         return result
+
+    def log_stack_operation(self, operation, token, output_stack, operator_stack):
+        self.steps.append(f"{operation} Token '{token}':\n"
+                          f"  Output Stack: {[str(node.value) for node in output_stack]}\n"
+                          f"  Operator Stack: {operator_stack}\n")
 
     def log_leaf_node(self, value, evaluated_value):
         self.steps.append(f"Evaluating Leaf Node '{value}': Value is {evaluated_value}\n")
@@ -457,14 +580,32 @@ class StepByStepSolver:
         self.steps.append(f"Final Calculation:\nThe final result of the expression evaluation is: {result}\n")
 
     def log_steps_for_expression(self, expression_type, details):
-        """Log the detailed steps for any type of expression."""
         self.steps.append("\n" + "-" * 80 + "\n")
-        
         if expression_type == "Polynomial":
             self.log_polynomial_steps(details)
-        # You can add more conditions for other expression types like Relational, Piecewise, Matrix, etc.
+        elif expression_type == "Vector":
+            self.log_vector_steps(details)
+        elif expression_type == "ComplexNumber":
+            self.log_complex_steps(details)
         else:
             self.steps.append(f"Unknown expression type '{expression_type}'. Cannot generate detailed steps.")
+
+    def log_vector_steps(self, details):
+        self.steps.append("Step 1: Understand the Vector Representation\n-----------------------------------------------")
+        self.steps.append(f"Left Vector: {details['left_vector']}")
+        self.steps.append(f"Right Vector: {details['right_vector']}")
+
+        self.steps.append("\nStep 2: Perform the Operation\n-----------------------------")
+        self.steps.append(f"- {details['operation']} of vectors results in: {details['result']}")
+
+    def log_complex_steps(self, details):
+        self.steps.append("Step 1: Understand the Complex Number Representation\n-----------------------------------------------")
+        self.steps.append(f"Left Complex Number: {details['left_complex']}")
+        self.steps.append(f"Right Complex Number: {details['right_complex']}")
+
+        self.steps.append("\nStep 2: Perform the Operation\n-----------------------------")
+        self.steps.append(f"- {details['operation']} of complex numbers results in: {details['result']}")
+
 
     def log_polynomial_steps(self, details):
         left_expr = self._format_polynomial(details['left_coefficients'])
@@ -490,23 +631,34 @@ class StepByStepSolver:
     def _format_polynomial(self, coefficients):
         terms = []
         degree = len(coefficients) - 1
+
         for i, coef in enumerate(coefficients):
             if coef == 0:
                 continue
-            term = ""
+
             if coef < 0:
-                term += "-"
-            elif i != 0:
-                term += "+"
-            if abs(coef) != 1 or degree == 0:
-                term += f"{abs(coef)}"
+                sign = '-' if len(terms) == 0 else ' - '
+            else:
+                sign = '' if len(terms) == 0 else ' + '
+
+            if abs(coef) != 1 or degree - i == 0:
+                term = f"{abs(coef)}"
+            else:
+                term = ""
+
             if degree - i > 0:
-                term += f"x^{degree - i}"
-            terms.append(term)
-        return " ".join(terms)
+                term += f"x"
+                if degree - i > 1:
+                    term += f"^{degree - i}"
+
+            terms.append(sign + term)
+
+        return "".join(terms)
 
     def get_detailed_steps(self):
-        return "\n".join(self.steps)
+        return "\n".join(self.steps) + "\n" + "\n".join(self.ast_construction_logs)
+
+
 # Polynomial class with operations and root finding
 class Polynomial:
     def __init__(self, coefficients):
@@ -516,12 +668,16 @@ class Polynomial:
         return f"Polynomial({self.coefficients})"
 
     def __add__(self, other):
-        diff = len(self.coefficients) - len(other.coefficients)
+        self_coeffs = self.coefficients[:]
+        other_coeffs = other.coefficients[:]
+
+        diff = len(self_coeffs) - len(other_coeffs)
         if diff > 0:
-            other.coefficients = [0] * diff + other.coefficients
+            other_coeffs = [0] * diff + other_coeffs
         elif diff < 0:
-            self.coefficients = [0] * (-diff) + self.coefficients
-        result = [a + b for a, b in zip(self.coefficients, other.coefficients)]
+            self_coeffs = [0] * (-diff) + self.coefficients
+
+        result = [a + b for a, b in zip(self_coeffs, other_coeffs)]
         return Polynomial(result)
 
     def __sub__(self, other):
@@ -573,6 +729,7 @@ class Polynomial:
             else:
                 return complex(-b / (2 * a), math.sqrt(-discriminant) / (2 * a)),
         return "Higher degree roots can be found using numerical methods or by factoring."
+
 
 # ComplexNumber class with basic arithmetic and root finding
 class ComplexNumber:
@@ -656,8 +813,11 @@ class Matrix:
             ).determinant() / det for j in range(self.cols)] for i in range(self.rows)]
         )
 
+    def __str__(self):
+        return f"Matrix({self.matrix})"
 
-# Vector class with arithmetic operations and dot/cross products
+
+# Vector class with basic operations
 class Vector:
     def __init__(self, components):
         self.components = components
@@ -682,54 +842,10 @@ class Vector:
             ]
         )
 
+    def __str__(self):
+        return f"Vector({self.components})"
 
-# Rational Expression handling
-class RationalExpression:
-    def __init__(self, numerator, denominator):
-        self.numerator = Polynomial(numerator)
-        self.denominator = Polynomial(denominator)
-
-    def simplify(self):
-        def gcd(a, b):
-            while b:
-                a, b = b, a % b
-            return a
-        
-        gcd_value = gcd(self.numerator.coefficients[-1], self.denominator.coefficients[-1])
-        simplified_numerator = [c // gcd_value for c in self.numerator.coefficients]
-        simplified_denominator = [c // gcd_value for c in self.denominator.coefficients]
-
-        return RationalExpression(simplified_numerator, simplified_denominator)
-
-    def add(self, other):
-        common_denominator = self.denominator * other.denominator
-        new_numerator = self.numerator * other.denominator + other.numerator * self.denominator
-        return RationalExpression(
-            new_numerator.coefficients, common_denominator.coefficients
-        ).simplify()
-
-    def subtract(self, other):
-        common_denominator = self.denominator * other.denominator
-        new_numerator = self.numerator * other.denominator - other.numerator * self.denominator
-        return RationalExpression(
-            new_numerator.coefficients, common_denominator.coefficients
-        ).simplify()
-
-    def multiply(self, other):
-        new_numerator = self.numerator * other.numerator
-        new_denominator = self.denominator * other.denominator
-        return RationalExpression(
-            new_numerator.coefficients, new_denominator.coefficients
-        ).simplify()
-
-    def divide(self, other):
-        new_numerator = self.numerator * other.denominator
-        new_denominator = self.denominator * other.numerator
-        return RationalExpression(
-            new_numerator.coefficients, new_denominator.coefficients
-        ).simplify()
-
-# Inequality Expression handling
+# InequalityExpression class with evaluation and interval representation
 class InequalityExpression:
     def __init__(self, left_expr, operator, right_expr):
         self.left_expr = left_expr
@@ -755,8 +871,11 @@ class InequalityExpression:
         elif '<' in this.operator:
             return f"(-∞, {self.right_expr})"
 
+    def __str__(self):
+        return f"InequalityExpression({self.left_expr} {self.operator} {self.right_expr})"
 
-# Piecewise Function Evaluation
+
+# PiecewiseExpression class for handling piecewise functions
 class PiecewiseExpression:
     def __init__(self, conditions, expressions):
         self.conditions = conditions
@@ -767,3 +886,6 @@ class PiecewiseExpression:
             if eval(condition.replace("x", str(x))):
                 return eval(expr.replace("x", str(x)))
         return None
+
+    def __str__(self):
+        return f"PiecewiseExpression({self.conditions}, {self.expressions})"
