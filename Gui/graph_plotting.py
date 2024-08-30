@@ -39,7 +39,7 @@ class GraphPlotterFrame(ttk.Frame):
         ttk.Label(self.sidebar_frame, text="Function Type:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=8, column=0, padx=10, pady=(10, 5), sticky=tk.W)
         self.function_type_combobox = ttk.Combobox(self.sidebar_frame, font=("Helvetica", 12), state="readonly", values=[
             "Linear", "Quadratic", "Cubic", "Polynomial", "Exponential", 
-            "Logarithmic", "Trigonometric"
+            "Logarithmic", "Trigonometric","Implicit"
         ])
         self.function_type_combobox.current(0)
         self.function_type_combobox.grid(row=9, column=0, padx=10, pady=5, sticky="ew")

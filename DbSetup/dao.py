@@ -1,10 +1,10 @@
 import sqlite3
 import json
 import datetime
+import logging
 from Interfaces.dao import IDataAccessObject
-
 class SQLiteDataAccessObject(IDataAccessObject):
-    def __init__(self, db_name: str = 'example.db'):
+    def __init__(self, db_name: str = 'my_project_database.db'):
         self.db_name = db_name
         self.connection = self._connect()
         self._create_tables()
@@ -95,13 +95,25 @@ class SQLiteDataAccessObject(IDataAccessObject):
         self.connection.commit()
         return cursor.lastrowid
 
-    def update(self, table: str, id: int, data: dict) -> bool:
-        set_clause = ', '.join([f"{key} = ?" for key in data])
-        sql = f"UPDATE {table} SET {set_clause} WHERE {table}_id = ?"
-        cursor = self.connection.cursor()
-        cursor.execute(sql, tuple(data.values()) + (id,))
-        self.connection.commit()
-        return cursor.rowcount > 0
+    def update(self, table: str, id: int, data: dict, id_column: str = "id") -> bool:
+        try:
+            set_clause = ', '.join([f"{key} = ?" for key in data])
+            sql = f"UPDATE {table} SET {set_clause} WHERE {id_column} = ?"
+            
+            logging.debug(f"Executing SQL: {sql} with data: {tuple(data.values()) + (id,)}")
+            
+            cursor = self.connection.cursor()
+            cursor.execute(sql, tuple(data.values()) + (id,))
+            self.connection.commit()
+        
+            success = cursor.rowcount > 0
+            logging.debug(f"Update successful: {success}")
+            return success
+        except sqlite3.Error as e:
+            logging.error(f"Database update failed: {e}")
+            return False
+
+
 
     def delete(self, table: str, id: int) -> bool:
         sql = f"DELETE FROM {table} WHERE {table}_id = ?"

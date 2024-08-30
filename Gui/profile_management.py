@@ -7,6 +7,7 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter.scrolledtext import ScrolledText  # Import ScrolledText
+import logging
 
 class ProfileManagement(ttk.Frame):
     def __init__(self, parent, controller):
@@ -178,13 +179,16 @@ class ProfileManagement(ttk.Frame):
             "profile_picture": profile_picture
         }
 
+        logging.debug(f"Saving profile with data: {new_data}")
+
         success = self.controller.profile_manager.updateProfile(self.user_id, new_data)
         if success:
             messagebox.showinfo("Profile Saved", f"Profile saved for {first_name} {last_name}.")
             self.load_profile_data()
         else:
+            logging.error(f"Failed to save profile for user_id: {self.user_id}")
             messagebox.showerror("Error", "Failed to save profile.")
-
+            
     def upload_picture(self):
         """Handle uploading a profile picture."""
         file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif")])

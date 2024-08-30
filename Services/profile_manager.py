@@ -2,6 +2,7 @@ from Interfaces.profile_manager import IProfileManager
 import datetime
 import sqlite3
 import json
+import logging
 
 class ProfileManager(IProfileManager):
     def __init__(self, db):
@@ -17,20 +18,47 @@ class ProfileManager(IProfileManager):
         return self.db.insert('PROFILE', profile_data)
 
     def updateProfile(self, userId: int, newData: dict) -> bool:
-        user_update_data = {
-            'first_name': newData.get('first_name'),
-            'last_name': newData.get('last_name'),
-            'profile_picture': sqlite3.Binary(newData['profile_picture']) if 'profile_picture' in newData and newData['profile_picture'] else None
-        }
-        user_updated = self.db.update('USER', userId, user_update_data)
-        
-        profile_update_data = {
-            'full_name': f"{newData.get('first_name', '')} {newData.get('last_name', '')}",
-            'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        profile_updated = self.db.update('PROFILE', userId, profile_update_data)
+        try:
+            # Prepare data for updating the USER table
+            user_update_data = {}
+            if 'first_name' in newData:
+                user_update_data['first_name'] = newData.get('first_name')
+            if 'last_name' in newData:
+                user_update_data['last_name'] = newData.get('last_name')
+            if 'profile_picture' in newData and newData['profile_picture']:
+                user_update_data['profile_picture'] = sqlite3.Binary(newData['profile_picture'])
+            
+            logging.debug(f"Updating USER table with: {user_update_data}")
+            
+            # Only attempt to update USER table if there is data to update
+            if user_update_data:
+                user_updated = self.db.update('USER', userId, user_update_data, id_column="user_id")
+            else:
+                user_updated = True  # If there's no data to update, consider it as a successful "no-op"
 
-        return user_updated and profile_updated
+            logging.debug(f"USER table updated: {user_updated}")
+            
+            # Prepare data for updating the PROFILE table
+            profile_update_data = {
+                'full_name': f"{newData.get('first_name', '')} {newData.get('last_name', '')}".strip(),
+                'last_updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+
+            logging.debug(f"Updating PROFILE table with: {profile_update_data}")
+            
+            # Update PROFILE table where user_id is the foreign key
+            profile_updated = self.db.update('PROFILE', userId, profile_update_data, id_column="user_id")
+
+            logging.debug(f"PROFILE table updated: {profile_updated}")
+            
+            return user_updated and profile_updated
+
+        except Exception as e:
+            logging.error(f"Failed to update profile for userId {userId}: {e}")
+            return False
+
+
+
 
     def getProfile(self, userId: int) -> dict:
         user_data = self.db.select('USER', f'user_id = {userId}')

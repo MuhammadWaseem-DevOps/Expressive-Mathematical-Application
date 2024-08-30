@@ -89,18 +89,30 @@ class DashboardFrame(ttk.Frame):
         return profile_data["full_name"] if profile_data and profile_data.get("full_name") else "User"
 
     def get_profile_image(self):
-        user_image_path = f"E:\\PROJECTS\\DessertationVersion1\\Expressive Mathematical Application\\user_images\\{self.controller.auth_service.get_current_user_id()}.png"
-        
-        if os.path.exists(user_image_path):
-            try:
-                image = Image.open(user_image_path)
-                image = image.resize((100, 100), Image.ANTIALIAS)
-                return ImageTk.PhotoImage(image)
-            except Exception as e:
-                print(f"Error loading user profile image: {e}")
-        
-        # If the image does not exist, create a blank image or a simple placeholder
-        return ImageTk.PhotoImage(Image.new('RGB', (100, 100), color='gray'))
+        # Fetch the image binary data from the database
+        try:
+            profile_data = self.controller.profile_manager.getProfile(self.user_id)
+            image_data = profile_data.get("profile_picture")  # Assuming the image is stored in the 'profile_picture' column
+
+            if image_data:
+                # Convert the binary data to an image
+                image = Image.open(io.BytesIO(image_data))
+                image = image.resize((100, 100), Image.Resampling.LANCZOS)
+                # Optional: Apply circular crop
+                image = self._resize_and_crop_image(image, size=(100, 100))
+                photo_image = ImageTk.PhotoImage(image)
+                return photo_image
+            else:
+                logging.warning("No profile image found in the database. Using placeholder image.")
+                # Return a placeholder image if no image data is found
+                return ImageTk.PhotoImage(Image.new('RGB', (100, 100), color='gray'))
+            
+        except Exception as e:
+            logging.error(f"Error loading profile image from database: {e}")
+            # Return a placeholder image in case of any error
+            return ImageTk.PhotoImage(Image.new('RGB', (100, 100), color='gray'))
+
+
 
     def _resize_and_crop_image(self, image, size=(100, 100)):
         image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
@@ -109,6 +121,7 @@ class DashboardFrame(ttk.Frame):
         draw.ellipse((0, 0) + size, fill=255)
         image.putalpha(mask)
         return image
+
 
     def load_recent_activities(self):
         # Clear the existing items in the treeview

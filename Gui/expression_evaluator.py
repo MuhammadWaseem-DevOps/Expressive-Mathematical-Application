@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from tkinter import messagebox, filedialog
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -188,23 +188,97 @@ class ExpressionInputFrame(ttk.Frame):
                 pdf_canvas = canvas.Canvas(file_path, pagesize=letter)
                 width, height = letter
                 
+                # Fetch the text from the output area
                 text = self.output_text.get(1.0, tk.END).strip()
                 pdf_canvas.setFont("Helvetica", 12)
-                pdf_canvas.drawString(100, height - 100, text)
                 
+                # Define the margin and maximum width for text
+                margin = 50
+                max_width = width - 2 * margin
+                current_height = height - 50  # Start from top, leaving some margin
+                
+                # Split the text into lines that fit within the page width
+                lines = []
+                for paragraph in text.splitlines():
+                    lines.extend(self.split_text_to_fit(paragraph, pdf_canvas, max_width))
+                    lines.append("")  # Add an empty line between paragraphs
+                
+                # Write each line to the PDF, managing the y-coordinate for each new line
+                for line in lines:
+                    if current_height <= 50:  # If there's no more room on the current page
+                        pdf_canvas.showPage()  # Create a new page
+                        pdf_canvas.setFont("Helvetica", 12)
+                        current_height = height - 50
+                    
+                    pdf_canvas.drawString(margin, current_height, line)
+                    current_height -= 14  # Move to the next line
+
                 pdf_canvas.save()
                 messagebox.showinfo("Export as PDF", "Output exported as PDF successfully!")
             except Exception as e:
                 messagebox.showerror("Export as PDF", f"Failed to export as PDF: {e}")
+
+    def split_text_to_fit(self, text, pdf_canvas, max_width):
+        """Split text into lines that fit within the given max_width."""
+        words = text.split(' ')
+        lines = []
+        line = ""
+        
+        for word in words:
+            test_line = f"{line} {word}".strip()
+            if pdf_canvas.stringWidth(test_line) <= max_width:
+                line = test_line
+            else:
+                lines.append(line)
+                line = word
+        
+        if line:
+            lines.append(line)
+        
+        return lines
+
 
     def export_as_image(self):
         """Export the current output as an image."""
         file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png"), ("JPEG Files", "*.jpg"), ("All Files", "*.*")])
         if file_path:
             try:
-                messagebox.showinfo("Export as Image", "This function has been disabled due to errors with image handling.")
+                # Create an image with sufficient dimensions to hold the output text and image
+                output_text_width = 800
+                output_text_height = 600  # Adjust height based on expected content size
+
+                # Create a new image with white background
+                image = Image.new("RGB", (output_text_width, output_text_height), "white")
+                draw = ImageDraw.Draw(image)
+
+                # Fetch the text from the output area and draw it onto the image
+                text = self.output_text.get(1.0, tk.END).strip()
+                lines = text.splitlines()
+
+                # Load a font (adjust path and size as necessary)
+                try:
+                    font = ImageFont.truetype("arial", 14)
+                except IOError:
+                    font = ImageFont.load_default()
+
+                y_text = 10
+                for line in lines:
+                    draw.text((10, y_text), line, font=font, fill="black")
+                    y_text += 20  # Move down for the next line of text
+
+                # If there's an AST image, draw it below the text
+                if self.ast_image:
+                    resized_image = self.ast_image.resize((200, 200), Image.Resampling.LANCZOS)  # Adjust size as needed
+                    image.paste(resized_image, (10, y_text + 20))
+
+                # Save the image to the specified path
+                image.save(file_path)
+                messagebox.showinfo("Export as Image", "Output exported as image successfully!")
+
             except Exception as e:
                 messagebox.showerror("Export as Image", f"Failed to export as image: {e}")
+
+
 
     def clear_all(self):
         """Clear both the input field and the output area."""
