@@ -15,7 +15,9 @@ class ExpressionEvaluator:
         self.functions = {
             'abs': abs,
             'sqrt': math.sqrt,
-            'log': math.log,
+            'log': math.log,           # Natural logarithm (base e)
+            'log10': math.log10,       # Base 10 logarithm
+            'log2': math.log2,         # Base 2 logarithm
             'sin': math.sin,
             'cos': math.cos,
             'tan': math.tan,
@@ -63,7 +65,7 @@ class ExpressionEvaluator:
             raise ValueError("Attempted to evaluate a None node. Check the AST construction for issues.")
 
         if node.left is None and node.right is None:
-            # Handling constants, variables, and functions
+            # Handle constants, variables, and functions
             if isinstance(node.value, str):
                 if node.value in self.constants:
                     value = self.constants[node.value]
@@ -74,13 +76,9 @@ class ExpressionEvaluator:
                     self.solver.log_variable(node.value, value)
                     return value
                 elif node.value in self.functions:
-                    # Here, we expect node.value to be a function name, so let's handle this case.
                     func = self.functions[node.value]
-                    if callable(func):
-                        self.solver.log_function(node.value, func)
-                        return func
-                    else:
-                        raise ValueError(f"Expected a callable function for {node.value}, but got {type(func)}.")
+                    self.solver.log_function(node.value, func)
+                    return func
                 elif node.value.replace('.', '', 1).isdigit():
                     value = float(node.value)
                     self.solver.log_leaf_node(node.value, value)
@@ -93,24 +91,21 @@ class ExpressionEvaluator:
         if node.value in self.functions:
             func = self.functions[node.value]
             if callable(func):
-                # For unary functions (like 'sqrt', 'sin', 'cos', etc.)
-                if node.right is not None:
-                    arg = self._evaluate_ast(node.right)
-                    result = func(arg)
-                    self.solver.log_operation(node.value, None, arg, result, node)
-                    return result
-                elif node.left is not None:
-                    arg = self._evaluate_ast(node.left)
-                    result = func(arg)
-                    self.solver.log_operation(node.value, arg, None, result, node)
-                    return result
-                else:
-                    raise ValueError(f"Function '{node.value}' requires an argument but none was provided.")
+                arg = self._evaluate_ast(node.right)
+                result = func(arg)
+                self.solver.log_operation(node.value, None, arg, result, node)
+                return result
             else:
                 raise ValueError(f"Expected a callable function for {node.value}, but got {type(func)}.")
 
         left_val = self._evaluate_ast(node.left) if node.left else None
         right_val = self._evaluate_ast(node.right) if node.right else None
+
+        if node.value == '-' and node.left is None:
+            # Handle unary negation
+            result = -right_val
+            self.solver.log_operation('negate', None, right_val, result, node)
+            return result
 
         if left_val is None or right_val is None:
             raise ValueError(f"Failed to evaluate operator '{node.value}' because one of the operands is None.")
@@ -335,6 +330,7 @@ class ExpressionEvaluator:
             elif operator == 'sqrt':
                 result = math.sqrt(right_val)
             elif operator == 'log':
+                # For custom base log (right_val as base)
                 result = math.log(left_val, right_val)
             elif operator == 'abs':
                 result = abs(right_val)
@@ -391,7 +387,7 @@ class ExpressionEvaluator:
                 right = output.pop() if output else None
                 left = output.pop() if output else None
 
-                if operator in ('+', '-', '*', '/', '^', '**') and (left is None or right is None):
+                if operator in ('+', '-', '*', '/', '^', '**') and (left is None and operator != '-' or right is None):
                     raise ValueError(f"Operator '{operator}' requires two operands, but got: Left: {left}, Right: {right}")
 
                 node = ExpressionEvaluator.ASTNode(operator, left, right)
@@ -433,7 +429,7 @@ class ExpressionEvaluator:
                         self.graph.add_node(id(func_node), label=func)
                         self.graph.add_edge(id(func_node), id(arg))
                         self.evaluator.solver.log_ast_construction(func_node)
-                elif token.isdigit() or token.replace('.', '', 1).isdigit():
+                elif token.isdigit() or (token.startswith('-') and token[1:].isdigit()):  # Handle negative numbers
                     node = ExpressionEvaluator.ASTNode(token)
                     output.append(node)
                     self.graph.add_node(id(node), label=token)
@@ -456,8 +452,7 @@ class ExpressionEvaluator:
             final_ast = output.pop()
             self.evaluator.solver.log_ast_construction(final_ast)
             return final_ast
-
-
+        
         def draw_ast(self, ast_node):
             def set_positions(node, x=0, y=0, positions=None, level=0, width_scale=10):
                 if positions is None:
@@ -882,13 +877,11 @@ class InequalityExpression:
 
     def to_interval(self):
         solution = self.solve()
-        if '>' in this.operator:
+        if '>' in self.operator:
             return f"({self.right_expr}, ∞)"
-        elif '<' in this.operator:
+        elif '<' in self.operator:
             return f"(-∞, {self.right_expr})"
 
     def __str__(self):
         return f"InequalityExpression({self.left_expr} {self.operator} {self.right_expr})"
-
-
 

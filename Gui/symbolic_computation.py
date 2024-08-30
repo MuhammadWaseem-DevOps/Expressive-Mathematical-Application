@@ -234,6 +234,9 @@ class SymbolicComputation(ttk.Frame):
 
     def plot_tangent(self, function, symbol, point, tangent):
         try:
+            # Close any previous plots
+            plt.close('all')
+
             sym = sp.Symbol(symbol)
             func_expr = sp.sympify(function)
             tangent_expr = sp.sympify(tangent)
@@ -255,9 +258,13 @@ class SymbolicComputation(ttk.Frame):
             plt.ylabel('y')
             plt.legend()
             plt.grid(True)
+            
+            # Show only the current plot
             plt.show()
+
         except Exception as e:
             messagebox.showerror("Plotting Error", f"Failed to plot the graph: {e}")
+
 
     def solve_line(self):
         expression = self.input_text.get().strip()
