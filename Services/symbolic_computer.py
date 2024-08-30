@@ -143,6 +143,8 @@ class SymbolicComputer:
                 elif token.value == ')':
                     while operators and not isinstance(operators[-1], Parenthesis):
                         output.append(operators.pop())
+                    if not operators or operators[-1].value != '(':
+                        raise ValueError("Mismatched parentheses")
                     operators.pop()  # Pop the '('
             elif isinstance(token, Bracket):
                 if token.value == '[':
@@ -150,6 +152,8 @@ class SymbolicComputer:
                 elif token.value == ']':
                     while operators and not isinstance(operators[-1], Bracket):
                         output.append(operators.pop())
+                    if not operators or operators[-1].value != '[':
+                        raise ValueError("Mismatched brackets")
                     operators.pop()  # Pop the '['
 
         while operators:
@@ -187,11 +191,22 @@ class SymbolicComputer:
     def evaluate_expression(self, expression: str):
         self.clear_steps()
 
+        # Check if it's a simple expression without '='
+        if '=' not in expression:
+            try:
+                sympy_expr = sp.sympify(expression)
+                
+                # Attempt to factor the expression
+                simplified_expr = sp.factor(sympy_expr)
+                
+                self.add_step(f"Simplifying the expression: {expression}")
+                self.add_step(f"Result: {simplified_expr}")
+                return simplified_expr, self.get_steps()
+            except Exception as e:
+                raise ValueError(f"Error evaluating expression: {e}")
+
         # Split the expression into LHS and RHS based on the equals sign
-        if '=' in expression:
-            lhs_expression, rhs_expression = expression.split('=')
-        else:
-            lhs_expression, rhs_expression = expression, '0'  # Assume the equation is equal to zero if no equals sign
+        lhs_expression, rhs_expression = expression.split('=')
 
         # Tokenize and process LHS
         lhs_tokens = self.tokenize(lhs_expression.strip())
@@ -277,22 +292,29 @@ class SymbolicComputer:
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
 
-        self.add_step("Steps to Differentiate:\n")
-        self.add_step(r"1. **Initial Expression**:\n")
-        self.add_step(rf"   \( f({symbol}) = {sp.pretty(expr)} \)\n")
+        # Replace '**' with '^' for more familiar notation
+        expr_str = str(expr).replace('**', '^')
+
+        self.add_step("Steps to Differentiate:")
+        self.add_step("1. **Initial Expression**:")
+        self.add_step(f"   f({symbol}) = {expr_str}")
 
         derivatives = []
         for term in expr.as_ordered_terms():
             term_derivative = sp.diff(term, sym)
+            term_str = str(term).replace('**', '^')
+            term_derivative_str = str(term_derivative).replace('**', '^')
             derivatives.append(term_derivative)
-            self.add_step(rf"   - The derivative of \( {sp.pretty(term)} \) with respect to \( {symbol} \) is \( {sp.pretty(term_derivative)} \).\n")
+            self.add_step(f"   - The derivative of {term_str} with respect to {symbol} is {term_derivative_str}.")
 
         derivative_expr = sum(derivatives)
-        self.add_step(r"\n3. **Combine the Results**:\n")
-        self.add_step(rf"   \( f'({symbol}) = {sp.pretty(derivative_expr)} \)\n")
+        derivative_expr_str = str(derivative_expr).replace('**', '^')
 
-        self.add_step(r"\n4. **Final Result**:\n")
-        self.add_step(rf"   The derivative of the expression \( {sp.pretty(expr)} \) with respect to \( {symbol} \) is **{sp.pretty(derivative_expr)}**.\n")
+        self.add_step("3. **Combine the Results**:")
+        self.add_step(f"   f'({symbol}) = {derivative_expr_str}")
+
+        self.add_step("4. **Final Result**:")
+        self.add_step(f"   The derivative of the expression {expr_str} with respect to {symbol} is **{derivative_expr_str}**.")
 
         return derivative_expr, self.get_steps()
 
@@ -300,9 +322,33 @@ class SymbolicComputer:
         self.clear_steps()
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
-        integral = sp.integrate(expr, sym)
-        self.add_step(f'Taking integral of {function} with respect to {symbol}: {integral} + C')
-        return integral, self.get_steps()
+
+        # Replace '**' with '^' for more familiar notation
+        expr_str = str(expr).replace('**', '^')
+
+        self.add_step("Steps to Integrate:")
+        self.add_step("1. **Initial Expression**:")
+        self.add_step(f"   ∫ {expr_str} d{symbol}")
+
+        terms = expr.as_ordered_terms()
+        integrals = []
+        for term in terms:
+            integral_term = sp.integrate(term, sym)
+            term_str = str(term).replace('**', '^')
+            integral_term_str = str(integral_term).replace('**', '^')
+            integrals.append(integral_term)
+            self.add_step(f"   - The integral of {term_str} with respect to {symbol} is {integral_term_str}.")
+
+        integral_expr = sum(integrals)
+        integral_expr_str = str(integral_expr).replace('**', '^')
+
+        self.add_step("3. **Combine the Results**:")
+        self.add_step(f"   ∫ {expr_str} d{symbol} = {integral_expr_str} + C")
+
+        self.add_step("4. **Final Result**:")
+        self.add_step(f"   The integral of the expression {expr_str} with respect to {symbol} is **{integral_expr_str} + C**.")
+
+        return integral_expr + sp.Symbol('C'), self.get_steps()
 
     def limit(self, function: str, symbol: str, point):
         self.clear_steps()
@@ -350,29 +396,45 @@ class SymbolicComputer:
 
     def ode_solver(self, equation: str, func: str):
         self.clear_steps()
-        x = sp.Symbol('x')
-        y = sp.Function(func)(x)
-        eq = sp.sympify(equation)
-        if not isinstance(eq, sp.Equality):
-            eq = sp.Eq(eq, 0)
-        self.add_step(f"Solving ordinary differential equation: {equation}")
-        solution = sp.dsolve(eq, y)
-        self.add_step(f"Solution of ODE: {solution}")
-        return solution, self.get_steps()
-
-    def pde_solver(self, equation, func):
-        self.clear_steps()
-        eq = equation
-        x, t = sp.symbols('x t')
-        y = sp.Function(func)(x, t)
-        self.add_step(f"Solving partial differential equation: {eq}")
+        
         try:
-            solution = sp.pdsolve(eq, y)
-            self.add_step(f"Solution of PDE: {solution}")
-        except NotImplementedError as e:
-            solution = str(e)
-            self.add_step(f"Error: {solution}")
-        return solution, self.get_steps()
+            # Create symbolic variables
+            x = sp.Symbol('x')
+            y = sp.Function(func)(x)
+
+            # Ensure the input equation is well-formed
+            if not equation:
+                raise ValueError("The equation cannot be empty.")
+
+            # Split equation into LHS and RHS
+            if '=' in equation:
+                lhs, rhs = equation.split('=')
+            else:
+                lhs, rhs = equation, "0"  # Assume the equation is equal to zero if no equals sign
+
+            # Strip and sympify LHS and RHS
+            lhs = lhs.strip()
+            rhs = rhs.strip()
+
+            # Debugging: Show the parsed LHS and RHS
+            print(f"Parsed LHS: {lhs}")
+            print(f"Parsed RHS: {rhs}")
+
+            # Try to create the symbolic equation
+            try:
+                eq = sp.Eq(sp.sympify(lhs), sp.sympify(rhs))
+            except Exception as e:
+                raise ValueError(f"Failed to parse equation. LHS: '{lhs}', RHS: '{rhs}'. Error: {e}")
+
+            self.add_step(f"Solving ordinary differential equation: {eq}")
+            solution = sp.dsolve(eq, y)
+            self.add_step(f"Solution of ODE: {solution}")
+            return solution, self.get_steps()
+
+        except sp.SympifyError as e:
+            raise ValueError(f"Sympify failed: Could not parse the equation '{equation}' due to: {e}")
+        except Exception as e:
+            raise ValueError(f"Error solving ODE: {e}\nEquation provided: {equation}")
 
     def tangent_line(self, function: str, symbol: str, point: float):
             self.clear_steps()
@@ -392,28 +454,37 @@ class SymbolicComputer:
                         f"   - Therefore, the equation of the tangent line is y = {sp.pretty(tangent)}.\n")
             self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
             return tangent, self.get_steps()
-    
-    def solve_exact_diff_eq(self, P, Q, x, y):
+    def solve_linear_equation(self, equation: str):
         self.clear_steps()
-        dP_dy = sp.diff(P, y)
-        dQ_dx = sp.diff(Q, x)
-        self.add_step(f"Computing partial derivatives: ∂P/∂y = {dP_dy}, ∂Q/∂x = {dQ_dx}.")
-        is_exact = sp.simplify(dP_dy - dQ_dx) == 0
-        if is_exact:
-            self.add_step("This is an exact differential equation.")
-            f_xy = sp.integrate(P, x) + sp.Function('h')(y)
-            self.add_step(f"Integrating P with respect to x: ∫P dx = {sp.integrate(P, x)} + h(y).")
-            f_xy_y = sp.diff(f_xy, y)
-            eq = sp.Eq(f_xy_y, Q)
-            self.add_step(f"Taking derivative with respect to y and setting equal to Q: {f_xy_y} = {Q}.")
-            h_y = sp.dsolve(eq, sp.Function('h')(y)).rhs
-            self.add_step(f"Solving for h(y): h(y) = {h_y}.")
-            f_xy = f_xy.subs(sp.Function('h')(y), h_y)
-            self.add_step(f"Final solution: f(x, y) = {f_xy}.")
-            return f_xy, self.get_steps()
-        else:
-            self.add_step("This is not an exact differential equation.")
-            return None, self.get_steps()
+
+        try:
+            # Split the equation into LHS and RHS
+            if '=' in equation:
+                lhs, rhs = equation.split('=')
+            else:
+                raise ValueError("The equation must have an equals sign.")
+
+            # Strip and convert to SymPy expression
+            lhs = lhs.strip()
+            rhs = rhs.strip()
+
+            # Convert LHS and RHS to sympy expressions
+            lhs_expr = sp.sympify(lhs)
+            rhs_expr = sp.sympify(rhs)
+
+            self.add_step(f"Solving the linear equation: {lhs_expr} = {rhs_expr}")
+
+            # Solve the equation
+            solution = sp.solve(lhs_expr - rhs_expr)
+
+            self.add_step(f"Solution: {solution}")
+
+            return solution, self.get_steps()
+
+        except sp.SympifyError as e:
+            raise ValueError(f"Sympify failed: Could not parse the equation '{equation}' due to: {e}")
+        except Exception as e:
+            raise ValueError(f"Error solving linear equation: {e}\nEquation provided: {equation}")
 
     def practice_problems(self, topic: str):
         problems = {

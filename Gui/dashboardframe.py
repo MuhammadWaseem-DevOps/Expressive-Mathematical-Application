@@ -5,6 +5,8 @@ import datetime
 import io
 import os
 import logging
+from tkinter.scrolledtext import ScrolledText
+
 
 class DashboardFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -109,20 +111,25 @@ class DashboardFrame(ttk.Frame):
         return image
 
     def load_recent_activities(self):
+        # Clear the existing items in the treeview
         self.recent_activities_tree.delete(*self.recent_activities_tree.get_children())
+
+        # Fetch the most recent activities
         recent_activities = self.get_recent_activities()
 
-        # Ensure activities are sorted by timestamp in descending order
-        recent_activities.sort(key=lambda x: x['timestamp'], reverse=True)
-
         for activity in recent_activities:
-            self.recent_activities_tree.insert("", tk.END, iid=activity['id'], values=(activity['activity'], activity['result'], self.time_since(activity['timestamp'])))
+            self.recent_activities_tree.insert("", tk.END, iid=activity['history_id'], 
+                                                values=(activity['equation'], activity['result'], self.time_since(activity['timestamp'])))
 
     def load_saved_computations(self):
         self.saved_computations_tree.delete(*self.saved_computations_tree.get_children())
         saved_computations = self.get_saved_computations()
 
-        for computation in saved_computations:
+        # Ensure computations are sorted by timestamp in descending order
+        saved_computations.sort(key=lambda x: x['history_id'], reverse=True)
+
+        # Limit the display to the 5 most recent saved computations
+        for computation in saved_computations[:5]:
             self.saved_computations_tree.insert("", tk.END, iid=computation['history_id'], values=(computation['equation'], computation['result']))
 
     def show_activity_details(self, event):
@@ -162,7 +169,6 @@ class DashboardFrame(ttk.Frame):
             return
 
         self.show_details_dialog(details)
-
     def show_details_dialog(self, details):
         detail_frame = tk.Toplevel(self)
         detail_frame.title("Computation Details")
@@ -175,52 +181,75 @@ class DashboardFrame(ttk.Frame):
         steps_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         steps = details.get('steps', [])
+
+        # Debugging: Print the steps to ensure they are retrieved correctly
+        print("Retrieved steps:", steps)
+
         if not steps:
             ttk.Label(steps_frame, text="No steps available.", font=("Helvetica", 12)).pack(anchor="w")
         else:
-            for i, step in enumerate(steps, start=1):
-                ttk.Label(steps_frame, text=f"Step {i}: {step}", font=("Helvetica", 12)).pack(anchor="w")
+            steps_text = ScrolledText(steps_frame, wrap=tk.WORD, font=("Helvetica", 12))
+            steps_text.pack(fill="both", expand=True)
+
+            # If steps is a single string, split it into a list
+            if isinstance(steps, str):
+                steps = steps.splitlines()
+
+            # Debugging: Print the processed steps to see if they are correctly split
+            print("Processed steps for display:", steps)
+
+            # Insert steps into the ScrolledText widget as multiline text
+            full_steps = "\n\n".join(steps)  # Assuming `steps` is a list of strings
+            steps_text.insert(tk.END, full_steps)
+
+        steps_text.config(state=tk.DISABLED)  # M
 
     def refresh_dashboard(self):
         self.load_recent_activities()
         self.load_saved_computations()
 
     def get_recent_activities(self):
-        activities = self.controller.dao.get_computation_history(self.user_id)
         recent_activities = []
-        for entry in activities:
-            try:
-                activity = {
-                    "id": entry[0],
-                    "activity": entry[2],
-                    "result": entry[3],
-                    "timestamp": entry[4]
-                }
-                recent_activities.append(activity)
-            except ValueError as e:
-                logging.error(f"Skipping entry due to invalid data: {entry} - Error: {e}")
-                continue
+        for entry in self.dao.get_computation_history(self.user_id):
+            recent_activities.append({
+                "history_id": entry[0],  # Assuming entry[0] is the unique identifier for the computation
+                "equation": entry[2],    # Assuming entry[2] is the equation/expression
+                "result": entry[3], 
+                "timestamp": entry[4]            # Assuming entry[3] is the result of the computation
+            })
+        # Limit the list to the most recent 10 activities
         return recent_activities
 
+
     def get_computation_statistics(self):
-        statistics = {}
+        # Fetch the computation history for the current user
         history = self.dao.get_computation_history(self.user_id)
         total_computations = len(history)
+        statistics = {}
+
         if total_computations > 0:
-            favorite_function = max(set([entry[3] for entry in history]), key=[entry[3] for entry in history].count)
+            # Determine the favorite function (most common result)
+            results = [entry[3] for entry in history]  # Assuming entry[3] is the result of the computation
+            favorite_function = max(set(results), key=results.count)
+
             statistics["Total Computations"] = total_computations
             statistics["Favorite Function"] = favorite_function
+        else:
+            statistics["Total Computations"] = 0
+            statistics["Favorite Function"] = "N/A"
+
         return statistics
 
     def get_saved_computations(self):
         computations = []
         for entry in self.dao.get_computation_history(self.user_id):
             computations.append({
-                "history_id": entry[0],
-                "equation": entry[2],
-                "result": entry[3]
+                "history_id": entry[0],  # Assuming entry[0] is the unique identifier for the computation
+                "equation": entry[2],    # Assuming entry[2] is the equation/expression
+                "result": entry[3]       # Assuming entry[3] is the result of the computation
             })
         return computations
+
 
     def time_since(self, timestamp):
         try:

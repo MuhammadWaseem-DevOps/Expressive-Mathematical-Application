@@ -10,12 +10,19 @@ class LoginScreen(ctk.CTkFrame):
 
         # Left image section
         left_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#F5F5F5")
-        left_frame.place(relx=0, rely=0, relwidth=0.5, relheight=1)
+        left_frame.place(relx=0, rely=0.1, relwidth=0.5, relheight=0.8)
 
-        image_path = "./assets/img/logo-img-1.webp"
+        image_path = "Gui/assets/logo.webp"
         try:
             image = Image.open(image_path)
-            image = image.resize((int(parent.winfo_screenwidth() * 0.5), parent.winfo_screenheight()), Image.ANTIALIAS)
+
+            # Attempt to use the new resampling method, fallback if necessary
+            try:
+                resample_filter = Image.Resampling.LANCZOS
+            except AttributeError:
+                resample_filter = Image.LANCZOS
+
+            image = image.resize((int(parent.winfo_screenwidth() * 0.5), parent.winfo_screenheight()), resample_filter)
             self.logo_image = ImageTk.PhotoImage(image)
             logo_label = tk.Label(left_frame, image=self.logo_image)
             logo_label.place(relwidth=1, relheight=1)

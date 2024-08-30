@@ -321,13 +321,13 @@ class ProfileManagement(ttk.Frame):
         if not steps:
             ttk.Label(steps_frame, text="No steps available.", font=("Helvetica", 12)).pack(anchor="w")
         else:
-            # Convert steps from the database (which is stored as a single string) to a proper multiline string
-            formatted_steps = steps.replace("\\n", "\n").replace("\\r", "")
-            
             # Use ScrolledText to display the steps
             steps_text = ScrolledText(steps_frame, wrap="word", font=("Helvetica", 12))
             steps_text.pack(fill="both", expand=True)
-            steps_text.insert("1.0", formatted_steps)
+
+            # Insert steps line by line
+            steps_text.insert("1.0", steps)
+
             steps_text.config(state="disabled")  # Make text read-only
 
         # Check if there is graph data and display it

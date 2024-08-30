@@ -32,8 +32,7 @@ class ExpressionEvaluator:
             'ComplexNumber': ComplexNumber,
             'Matrix': Matrix,
             'Vector': Vector,
-            'InequalityExpression': InequalityExpression,
-            'PiecewiseExpression': PiecewiseExpression
+            'InequalityExpression': InequalityExpression
         }
         self.solver = StepByStepSolver()
         self.dao = dao  # Data Access Object for database operations
@@ -141,9 +140,6 @@ class ExpressionEvaluator:
                     obj = self.object_classes[class_name](*params_list)
                 elif class_name == 'InequalityExpression':
                     params_list = self._parse_inequality_expression_parameters(params)
-                    obj = self.object_classes[class_name](*params_list)
-                elif class_name == 'PiecewiseExpression':
-                    params_list = self._parse_piecewise_expression_parameters(params)
                     obj = self.object_classes[class_name](*params_list)
                 elif class_name == 'ComplexNumber':
                     # Properly parsing ComplexNumber parameters
@@ -375,7 +371,7 @@ class ExpressionEvaluator:
         def tokenize(self, expression):
             token_pattern = re.compile(
                 r'Polynomial\(\[.*?\]\)|Matrix\(\[\[.*?\]\]\)|Vector\(\[.*?\]\)|InequalityExpression\(".*?","\w+",".*?"\)|'
-                r'PiecewiseExpression\(\[.*?\],\[.*?\]\)|ComplexNumber\([ \d.,-]+\)|\d+\.?\d*|[a-zA-Z_]\w*|[()+\-*/^=<>!&|]')
+                r'ComplexNumber\([ \d.,-]+\)|\d+\.?\d*|[a-zA-Z_]\w*|[()+\-*/^=<>!&|]')
             tokens = token_pattern.findall(expression)
             self.evaluator.solver.log_tokenization(tokens)
             return tokens
@@ -410,7 +406,7 @@ class ExpressionEvaluator:
             while self.pos < len(self.tokens):
                 token = self.tokens[self.pos]
 
-                if token.startswith('Polynomial') or token.startswith('Matrix') or token.startswith('Vector') or token.startswith('InequalityExpression') or token.startswith('PiecewiseExpression') or token.startswith('ComplexNumber'):
+                if token.startswith('Polynomial') or token.startswith('Matrix') or token.startswith('Vector') or token.startswith('InequalityExpression') or token.startswith('ComplexNumber'):
                     node = self.evaluator._instantiate_object(token)
                     ast_node = ExpressionEvaluator.ASTNode(node)
                     output.append(ast_node)
@@ -895,17 +891,4 @@ class InequalityExpression:
         return f"InequalityExpression({self.left_expr} {self.operator} {self.right_expr})"
 
 
-# PiecewiseExpression class for handling piecewise functions
-class PiecewiseExpression:
-    def __init__(self, conditions, expressions):
-        self.conditions = conditions
-        self.expressions = expressions
 
-    def evaluate(self, x):
-        for condition, expr in zip(self.conditions, self.expressions):
-            if eval(condition.replace("x", str(x))):
-                return eval(expr.replace("x", str(x)))
-        return None
-
-    def __str__(self):
-        return f"PiecewiseExpression({self.conditions}, {self.expressions})"

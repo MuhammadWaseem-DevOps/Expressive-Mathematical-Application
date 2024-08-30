@@ -9,6 +9,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from Services.symbolic_computer import SymbolicComputer
 import sympy as sp
+import json
+
 
 class SymbolicComputation(ttk.Frame):
     def __init__(self, parent, controller):
@@ -60,7 +62,7 @@ class SymbolicComputation(ttk.Frame):
         line_button = ttk.Button(button_frame, text="Line", command=self.solve_line)
         line_button.pack(side=tk.LEFT, padx=5)
 
-        dropdown = ttk.Combobox(button_frame, values=["See All", "Derivative", "Integral", "Limit", "ODE Solver", "PDE Solver"])
+        dropdown = ttk.Combobox(button_frame, values=["See All", "Derivative", "Integral", "Limit", "ODE Solver"])
         dropdown.current(0)
         dropdown.bind("<<ComboboxSelected>>", self.handle_dropdown_selection)
         dropdown.pack(side=tk.LEFT, padx=5)
@@ -106,8 +108,6 @@ class SymbolicComputation(ttk.Frame):
             self.solve_limit()
         elif selected == "ODE Solver":
             self.solve_ode()
-        elif selected == "PDE Solver":
-            self.solve_pde()
 
     def solve(self):
         expression = self.input_text.get().strip()
@@ -186,35 +186,35 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                equation, func = expression.split(',')
-                result, steps = self.computer.ode_solver(equation.strip(), func.strip())
+                # Ensure there is only one comma separating the equation from the function name
+                parts = expression.rsplit(',', 1)
+                if len(parts) != 2:
+                    raise ValueError("Please enter the equation followed by the dependent function, separated by a comma.")
+
+                equation = parts[0].strip()
+                func = parts[1].strip()
+
+                # Debugging: Output the equation and function being processed
+                print(f"Input equation: {equation}")
+                print(f"Function: {func}")
+
+                # Check if the equation is empty or improperly formatted
+                if not equation or not func:
+                    raise ValueError("Both the equation and function name must be provided and non-empty.")
+
+                result, steps = self.computer.ode_solver(equation, func)
                 self.last_steps = steps
                 self.display_result(f"ODE Solution: {result}")
                 self.display_steps()
                 self.statusbar.config(text="ODE solution completed successfully.")
                 self.save_computation_to_db(expression, result, steps, "ode_solver")  # Save to DB
+            except ValueError as ve:
+                messagebox.showerror("Input Error", f"Input format error: {ve}")
+                self.statusbar.config(text="Input error.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in ODE solution.")
         self.update_history()
-
-    def solve_pde(self):
-        expression = self.input_text.get().strip()
-        if expression:
-            try:
-                equation, func = expression.split(',')
-                eq = sp.sympify(equation)
-                result, steps = self.computer.pde_solver(eq, func.strip())
-                self.last_steps = steps
-                self.display_result(f"PDE Solution: {result}")
-                self.display_steps()
-                self.statusbar.config(text="PDE solution completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "pde_solver")  # Save to DB
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
-                self.statusbar.config(text="Error in PDE solution.")
-        self.update_history()
-
     def solve_tangent(self):
         expression = self.input_text.get().strip()
         if expression:
@@ -263,12 +263,58 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                self.display_result("Line feature not implemented yet.")
-                self.statusbar.config(text="Line feature not implemented yet.")
+                # Clear any previous steps
+                self.computer.clear_steps()
+                
+                # Split the equation by the '=' sign
+                if '=' not in expression:
+                    raise ValueError("The equation must contain an '=' sign.")
+                
+                lhs, rhs = expression.split('=')
+                lhs_expr = sp.sympify(lhs.strip())
+                rhs_expr = sp.sympify(rhs.strip())
+
+                # Step 1: Show the initial equation
+                self.computer.add_step(f"**Step 1:** Start with the equation: {lhs} = {rhs}")
+
+                # Step 2: Expand both sides
+                lhs_expanded = sp.expand(lhs_expr)
+                rhs_expanded = sp.expand(rhs_expr)
+                self.computer.add_step(f"**Step 2:** Expand both sides:\n   LHS: {lhs_expanded}\n   RHS: {rhs_expanded}")
+
+                # Step 3: Move all terms to one side
+                equation = lhs_expanded - rhs_expanded
+                self.computer.add_step(f"**Step 3:** Move all terms to one side to set the equation to 0:\n   {equation} = 0")
+
+                # Step 4: Simplify the equation
+                simplified_eq = sp.simplify(equation)
+                self.computer.add_step(f"**Step 4:** Simplify the equation:\n   {simplified_eq} = 0")
+
+                # Check if equation is valid (i.e., it should not simplify to something like -9 = 0)
+                if simplified_eq == 0:
+                    raise ValueError("The equation simplifies to 0 = 0, which indicates that it is either an identity or has no solution.")
+                if isinstance(simplified_eq, (sp.Integer, sp.Float)) and simplified_eq != 0:
+                    raise ValueError("The equation simplifies to a contradiction, meaning there is no solution.")
+
+                # Step 5: Solve the equation
+                solution = sp.solve(simplified_eq, dict=True)
+                self.computer.add_step(f"**Step 5:** Solve the equation for the variable(s):\n   Solution: {solution}")
+
+                # Display result and steps
+                self.last_steps = self.computer.get_steps()
+                self.display_result(f"Line Solution: {solution}")
+                self.display_steps()
+                self.statusbar.config(text="Line equation solved successfully.")
+                self.save_computation_to_db(expression, solution, self.last_steps, "line_solver")  # Save to DB
+
+            except ValueError as ve:
+                messagebox.showerror("Input Error", f"Input format error: {ve}")
+                self.statusbar.config(text="Input error.")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
-                self.statusbar.config(text="Error in line calculation.")
+                self.statusbar.config(text="Error in line solution.")
         self.update_history()
+
 
     def simplify(self):
         expression = self.input_text.get().strip()
@@ -295,7 +341,7 @@ class SymbolicComputation(ttk.Frame):
                 'expression': expression,
                 'result': str(result),  # Ensure result is a string
                 'computation_type': computation_type,
-                'symbolic_steps': str(steps),  # Convert steps to string
+                'symbolic_steps': json.dumps(steps),  # Convert steps to JSON string
                 'timestamp': datetime.datetime.now().isoformat()  # Format timestamp
             }
             logging.debug(f"Formatted entry: {entry}")
