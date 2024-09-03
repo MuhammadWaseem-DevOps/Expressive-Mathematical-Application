@@ -18,7 +18,6 @@ class SymbolicComputation(ttk.Frame):
         self.parent = parent
         self.controller = controller
 
-        # Initialize the symbolic computation components
         self.computer = SymbolicComputer()
         self.history = []
         self.future = []
@@ -79,7 +78,6 @@ class SymbolicComputation(ttk.Frame):
         self.step_tab = ScrolledText(tab_control, wrap=tk.WORD, state=tk.DISABLED)
         tab_control.add(self.step_tab, text="Steps")
 
-        # Create a new frame for the Undo, Redo, and Save buttons just above the status bar
         bottom_button_frame = ttk.Frame(main_frame)
         bottom_button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
 
@@ -92,11 +90,9 @@ class SymbolicComputation(ttk.Frame):
         save_button = ttk.Button(bottom_button_frame, text="Save", command=self.save_solution)
         save_button.pack(side=tk.LEFT, padx=5)
 
-
     def create_statusbar(self):
         self.statusbar = ttk.Label(self, text="Ready", relief=tk.SUNKEN, anchor=tk.W, padding="5")
         self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
-
 
     def handle_dropdown_selection(self, event):
         selected = event.widget.get()
@@ -113,7 +109,6 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                # Check if the expression looks like a matrix (basic check)
                 if expression.startswith("[[") and expression.endswith("]]"):
                     result = self.computer.matrix_operations(expression)
                     self.display_result(f"Matrix Result: {result['matrix']}\n"
@@ -125,10 +120,10 @@ class SymbolicComputation(ttk.Frame):
                     result, steps = self.computer.evaluate_expression(expression)
                     self.display_result(f"Result: {result}")
                     
-                self.last_steps = steps  # Store steps for later display
+                self.last_steps = steps 
                 self.display_steps()
                 self.statusbar.config(text="Calculation completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "evaluation")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "evaluation")  
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in calculation.")
@@ -144,7 +139,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Derivative: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Derivative calculation completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "derivative")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "derivative") 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in derivative calculation.")
@@ -160,7 +155,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Integral: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Integral calculation completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "integral")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "integral") 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in integral calculation.")
@@ -176,7 +171,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Limit: {result}")
                 self.display_steps()
                 self.statusbar.config(text="Limit calculation completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "limit")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "limit") 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in limit calculation.")
@@ -186,7 +181,6 @@ class SymbolicComputation(ttk.Frame):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                # Ensure there is only one comma separating the equation from the function name
                 parts = expression.rsplit(',', 1)
                 if len(parts) != 2:
                     raise ValueError("Please enter the equation followed by the dependent function, separated by a comma.")
@@ -194,11 +188,9 @@ class SymbolicComputation(ttk.Frame):
                 equation = parts[0].strip()
                 func = parts[1].strip()
 
-                # Debugging: Output the equation and function being processed
                 print(f"Input equation: {equation}")
                 print(f"Function: {func}")
 
-                # Check if the equation is empty or improperly formatted
                 if not equation or not func:
                     raise ValueError("Both the equation and function name must be provided and non-empty.")
 
@@ -207,7 +199,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"ODE Solution: {result}")
                 self.display_steps()
                 self.statusbar.config(text="ODE solution completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "ode_solver")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "ode_solver")  
             except ValueError as ve:
                 messagebox.showerror("Input Error", f"Input format error: {ve}")
                 self.statusbar.config(text="Input error.")
@@ -215,6 +207,7 @@ class SymbolicComputation(ttk.Frame):
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in ODE solution.")
         self.update_history()
+  
     def solve_tangent(self):
         expression = self.input_text.get().strip()
         if expression:
@@ -226,7 +219,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_steps()
                 self.plot_tangent(function.strip(), symbol.strip(), float(point.strip()), result)
                 self.statusbar.config(text="Tangent line calculation and graph completed successfully.")
-                self.save_computation_to_db(expression, result, steps, "tangent_line")  # Save to DB
+                self.save_computation_to_db(expression, result, steps, "tangent_line") 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in tangent line calculation.")
@@ -234,7 +227,6 @@ class SymbolicComputation(ttk.Frame):
 
     def plot_tangent(self, function, symbol, point, tangent):
         try:
-            # Close any previous plots
             plt.close('all')
 
             sym = sp.Symbol(symbol)
@@ -259,21 +251,17 @@ class SymbolicComputation(ttk.Frame):
             plt.legend()
             plt.grid(True)
             
-            # Show only the current plot
             plt.show()
 
         except Exception as e:
             messagebox.showerror("Plotting Error", f"Failed to plot the graph: {e}")
 
-
     def solve_line(self):
         expression = self.input_text.get().strip()
         if expression:
             try:
-                # Clear any previous steps
                 self.computer.clear_steps()
                 
-                # Split the equation by the '=' sign
                 if '=' not in expression:
                     raise ValueError("The equation must contain an '=' sign.")
                 
@@ -281,38 +269,31 @@ class SymbolicComputation(ttk.Frame):
                 lhs_expr = sp.sympify(lhs.strip())
                 rhs_expr = sp.sympify(rhs.strip())
 
-                # Step 1: Show the initial equation
                 self.computer.add_step(f"**Step 1:** Start with the equation: {lhs} = {rhs}")
 
-                # Step 2: Expand both sides
                 lhs_expanded = sp.expand(lhs_expr)
                 rhs_expanded = sp.expand(rhs_expr)
                 self.computer.add_step(f"**Step 2:** Expand both sides:\n   LHS: {lhs_expanded}\n   RHS: {rhs_expanded}")
 
-                # Step 3: Move all terms to one side
                 equation = lhs_expanded - rhs_expanded
                 self.computer.add_step(f"**Step 3:** Move all terms to one side to set the equation to 0:\n   {equation} = 0")
 
-                # Step 4: Simplify the equation
                 simplified_eq = sp.simplify(equation)
                 self.computer.add_step(f"**Step 4:** Simplify the equation:\n   {simplified_eq} = 0")
 
-                # Check if equation is valid (i.e., it should not simplify to something like -9 = 0)
                 if simplified_eq == 0:
                     raise ValueError("The equation simplifies to 0 = 0, which indicates that it is either an identity or has no solution.")
                 if isinstance(simplified_eq, (sp.Integer, sp.Float)) and simplified_eq != 0:
                     raise ValueError("The equation simplifies to a contradiction, meaning there is no solution.")
 
-                # Step 5: Solve the equation
                 solution = sp.solve(simplified_eq, dict=True)
                 self.computer.add_step(f"**Step 5:** Solve the equation for the variable(s):\n   Solution: {solution}")
 
-                # Display result and steps
                 self.last_steps = self.computer.get_steps()
                 self.display_result(f"Line Solution: {solution}")
                 self.display_steps()
                 self.statusbar.config(text="Line equation solved successfully.")
-                self.save_computation_to_db(expression, solution, self.last_steps, "line_solver")  # Save to DB
+                self.save_computation_to_db(expression, solution, self.last_steps, "line_solver")
 
             except ValueError as ve:
                 messagebox.showerror("Input Error", f"Input format error: {ve}")
@@ -321,7 +302,6 @@ class SymbolicComputation(ttk.Frame):
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in line solution.")
         self.update_history()
-
 
     def simplify(self):
         expression = self.input_text.get().strip()
@@ -333,7 +313,7 @@ class SymbolicComputation(ttk.Frame):
                 self.display_result(f"Simplified Result: {simplified_result}")
                 self.display_steps()
                 self.statusbar.config(text="Simplification completed successfully.")
-                self.save_computation_to_db(expression, simplified_result, steps, "simplification")  # Save to DB
+                self.save_computation_to_db(expression, simplified_result, steps, "simplification")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
                 self.statusbar.config(text="Error in simplification.")
@@ -346,10 +326,10 @@ class SymbolicComputation(ttk.Frame):
             entry = {
                 'user_id': user_id,
                 'expression': expression,
-                'result': str(result),  # Ensure result is a string
+                'result': str(result), 
                 'computation_type': computation_type,
-                'symbolic_steps': json.dumps(steps),  # Convert steps to JSON string
-                'timestamp': datetime.datetime.now().isoformat()  # Format timestamp
+                'symbolic_steps': json.dumps(steps),
+                'timestamp': datetime.datetime.now().isoformat()
             }
             logging.debug(f"Formatted entry: {entry}")
             self.controller.computation_history.add_entry(entry)
@@ -377,11 +357,9 @@ class SymbolicComputation(ttk.Frame):
         current_input = self.input_text.get().strip()
 
         if self.history:
-            # Push the current input to the future stack only if it's not the same as the last history entry
             if not self.future or self.future[-1] != current_input:
                 self.future.append(current_input)
 
-            # Pop the last input from history and set it to the input text
             last_input = self.history.pop()
             self.input_text.delete(0, tk.END)
             self.input_text.insert(0, last_input)
@@ -393,18 +371,15 @@ class SymbolicComputation(ttk.Frame):
         current_input = self.input_text.get().strip()
 
         if self.future:
-            # Push the current input to the history stack only if it's not the same as the last future entry
             if not self.history or self.history[-1] != current_input:
                 self.history.append(current_input)
 
-            # Pop the last input from the future stack and set it to the input text
             next_input = self.future.pop()
             self.input_text.delete(0, tk.END)
             self.input_text.insert(0, next_input)
             self.statusbar.config(text="Redo performed.")
         else:
             self.statusbar.config(text="Nothing to redo.")
-
 
     def save_solution(self):
         file_types = [("PDF files", "*.pdf"), ("PNG files", "*.png"), ("Text files", "*.txt")]
@@ -422,18 +397,14 @@ class SymbolicComputation(ttk.Frame):
 
     def save_as_pdf(self, file_path):
         try:
-            # Create a canvas for the PDF
             c = canvas.Canvas(file_path, pagesize=letter)
             width, height = letter
 
-            # Set font and starting position
             c.setFont("Helvetica", 12)
             textobject = c.beginText(40, height - 40)
 
-            # Get the content from the result tab
             content = self.result_tab.get("1.0", tk.END)
 
-            # Add content to the PDF
             for line in content.splitlines():
                 textobject.textLine(line)
 
@@ -444,7 +415,6 @@ class SymbolicComputation(ttk.Frame):
             self.statusbar.config(text=f"Solution saved as PDF: {file_path}")
         except Exception as e:
             messagebox.showerror("Save Solution", f"Error saving as PDF: {e}")
-
 
     def save_as_image(self, file_path):
         try:

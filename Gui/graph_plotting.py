@@ -7,18 +7,15 @@ class GraphPlotterFrame(ttk.Frame):
         super().__init__(parent, *args, **kwargs)
         self.controller = controller
 
-        # Configure styles
         self.style = ttk.Style()
         self.style.configure('GraphPlotter.TFrame', background='#f0f0f0')
         self.style.configure('Sidebar.TButton', padding=6, font=("Helvetica", 10))
         self.style.configure('Sidebar.TFrame', background='#2c3e50')
         self.style.configure('Zoom.TButton', padding=6, font=("Helvetica", 10))
 
-        # Create sidebar frame
         self.sidebar_frame = ttk.Frame(self, width=250, style='Sidebar.TFrame')
         self.sidebar_frame.grid(row=0, column=0, sticky="ns")
 
-        # Add entries and buttons to the sidebar
         ttk.Label(self.sidebar_frame, text="Function:", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50').grid(row=0, column=0, padx=10, pady=(10, 5), sticky=tk.W)
         self.function_entry = ttk.Entry(self.sidebar_frame, font=("Helvetica", 12))
         self.function_entry.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
@@ -44,7 +41,6 @@ class GraphPlotterFrame(ttk.Frame):
         self.function_type_combobox.current(0)
         self.function_type_combobox.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
 
-        # Units for trigonometric functions
         self.units_label = ttk.Label(self.sidebar_frame, text="Units (for trig):", font=("Helvetica", 12), foreground="#ecf0f1", background='#2c3e50')
         self.units_label.grid(row=10, column=0, padx=10, pady=(10, 5), sticky=tk.W)
         self.units_combobox = ttk.Combobox(self.sidebar_frame, font=("Helvetica", 12), state="readonly", values=["Radians", "Degrees"])
@@ -57,22 +53,17 @@ class GraphPlotterFrame(ttk.Frame):
         export_button = ttk.Button(self.sidebar_frame, text="Export", command=self.export_graph, style='Sidebar.TButton')
         export_button.grid(row=13, column=0, padx=10, pady=(10, 10), sticky="ew")
 
-        # Create the main plot canvas
         self.plot_canvas = tk.Canvas(self, bg='#ffffff')
         self.plot_canvas.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
-        # Fetch the user ID
         user_id = self.controller.auth_service.get_current_user_id()
         if user_id is None:
             raise ValueError("User ID is None. Please ensure the user is logged in.")
 
-        # Create an instance of GraphPlotter, passing the Canvas, DAO, and user ID
         self.graph_plotter = GraphPlotter(self.plot_canvas, dao=self.controller.dao, user_id=user_id)
 
-        # Bind the resize event to redraw the grid
         self.plot_canvas.bind("<Configure>", self.on_resize)
 
-        # Create zoom control frame
         self.zoom_frame = ttk.Frame(self, style='Sidebar.TFrame')
         self.zoom_frame.grid(row=0, column=2, sticky="ns")
         
@@ -83,20 +74,17 @@ class GraphPlotterFrame(ttk.Frame):
         settings_button = ttk.Button(self.zoom_frame, text="⚙", style='Zoom.TButton')
         settings_button.grid(row=2, column=0, padx=10, pady=5)
 
-        # Make the plot area expandable
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
-        # Status display at the bottom of the plot
         self.status_display = ttk.Label(self, text="", font=("Helvetica", 12), foreground="#2c3e50")
         self.status_display.grid(row=1, column=1, columnspan=5, pady=(10, 20))
 
-        # Draw initial grid
         self.draw_grid()
 
     def draw_grid(self):
         """Draw a grid on the canvas."""
-        self.plot_canvas.delete("grid_line")  # Remove existing grid lines, if any
+        self.plot_canvas.delete("grid_line") 
         width = self.plot_canvas.winfo_width()
         height = self.plot_canvas.winfo_height()
         grid_size = 20
@@ -116,7 +104,7 @@ class GraphPlotterFrame(ttk.Frame):
             units = self.units_combobox.get()
 
             if function_type == "Implicit":
-                y_min, y_max = range_start, range_end  # For implicit functions, we need y-range too
+                y_min, y_max = range_start, range_end 
                 self.graph_plotter.plot_implicit(function, range_start, range_end, y_min, y_max)
             else:
                 self.graph_plotter.plot_function(function, variable, range_start, range_end, function_type, units)

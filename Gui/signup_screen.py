@@ -8,14 +8,12 @@ class SignupScreen(ctk.CTkFrame):
         self.controller = controller
         self.configure(fg_color="#F5F5F5")
 
-        # Left image section
         left_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#F5F5F5")
         left_frame.place(relx=0, rely=0.1, relwidth=0.5, relheight=0.8)
         image_path = "Gui/assets/logo.webp"
         try:
             image = Image.open(image_path)
 
-            # Attempt to use the new resampling method, fallback if necessary
             try:
                 resample_filter = Image.Resampling.LANCZOS
             except AttributeError:
@@ -29,7 +27,6 @@ class SignupScreen(ctk.CTkFrame):
             logo_label = ctk.CTkLabel(left_frame, text="Image not found", font=("Helvetica", 22, "bold"), text_color="#333333", fg_color="#F5F5F5")
             logo_label.place(relwidth=1, relheight=1)
 
-        # Right form section
         right_frame = ctk.CTkFrame(self, corner_radius=10, fg_color="#FFFFFF")
         right_frame.place(relx=0.5, rely=0.1, relwidth=0.4, relheight=0.8)
 

@@ -19,7 +19,6 @@ class ProfileManager(IProfileManager):
 
     def updateProfile(self, userId: int, newData: dict) -> bool:
         try:
-            # Prepare data for updating the USER table
             user_update_data = {}
             if 'first_name' in newData:
                 user_update_data['first_name'] = newData.get('first_name')
@@ -30,11 +29,10 @@ class ProfileManager(IProfileManager):
             
             logging.debug(f"Updating USER table with: {user_update_data}")
             
-            # Only attempt to update USER table if there is data to update
             if user_update_data:
                 user_updated = self.db.update('USER', userId, user_update_data, id_column="user_id")
             else:
-                user_updated = True  # If there's no data to update, consider it as a successful "no-op"
+                user_updated = True  
 
             logging.debug(f"USER table updated: {user_updated}")
             
@@ -56,9 +54,6 @@ class ProfileManager(IProfileManager):
         except Exception as e:
             logging.error(f"Failed to update profile for userId {userId}: {e}")
             return False
-
-
-
 
     def getProfile(self, userId: int) -> dict:
         user_data = self.db.select('USER', f'user_id = {userId}')

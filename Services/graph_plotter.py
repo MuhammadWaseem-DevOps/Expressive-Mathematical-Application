@@ -22,7 +22,6 @@ class GraphPlotter:
 
     def _prepare_function(self, function: str) -> str:
         """Convert user-friendly mathematical functions to NumPy equivalents."""
-        # Replace common math functions with NumPy equivalents
         replacements = {
             r'\bsin\b': 'np.sin',
             r'\bcos\b': 'np.cos',
@@ -30,8 +29,8 @@ class GraphPlotter:
             r'\blog\b': 'np.log',
             r'\bexp\b': 'np.exp',
             r'\bsqrt\b': 'np.sqrt',
-            r'\^': '**',  # Replace caret with exponentiation
-            r'(\d)([a-zA-Z\(])': r'\1*\2'  # Implicit multiplication
+            r'\^': '**', 
+            r'(\d)([a-zA-Z\(])': r'\1*\2' 
         }
 
         for pattern, replacement in replacements.items():
@@ -43,7 +42,6 @@ class GraphPlotter:
         function = self._prepare_function(function)
         x = np.linspace(x_min, x_max, 400)
         
-        # Handle trigonometric functions and units
         if function_type == "Trigonometric" and units == "Degrees":
             x = np.deg2rad(x)
         
@@ -88,13 +86,11 @@ class GraphPlotter:
             'x_max': x_max,
         }
         
-        # Save the plot image as a PNG file in memory
         buffer = io.BytesIO()
         self.figure.savefig(buffer, format='png')
         image_data = buffer.getvalue()
         buffer.close()
 
-        # Save graph data in GRAPHICAL_FUNCTION table
         graph_entry = {
             'user_id': self.user_id,
             'function': function,
@@ -105,7 +101,6 @@ class GraphPlotter:
         }
         graph_data_id = self.dao.insert('GRAPHICAL_FUNCTION', graph_entry)
 
-        # Link to computation history
         history_entry = {
             'user_id': self.user_id,
             'expression': function,
@@ -142,30 +137,6 @@ class GraphPlotter:
         self.ax = self.figure.add_subplot(111, projection='3d')
         self.ax.plot_surface(x, y, z, cmap='viridis')
         self.ax.set_title("3D Plot")
-        self.plot_canvas.draw()
-
-    def plot_bar(self, categories: list, values: list):
-        self.ax.clear()
-        self.ax.bar(categories, values)
-        self.ax.set_title("Bar Chart")
-        self.plot_canvas.draw()
-
-    def plot_scatter(self, x_values: list, y_values: list):
-        self.ax.clear()
-        self.ax.scatter(x_values, y_values)
-        self.ax.set_title("Scatter Plot")
-        self.plot_canvas.draw()
-
-    def plot_histogram(self, data: list, bins: int):
-        self.ax.clear()
-        self.ax.hist(data, bins=bins)
-        self.ax.set_title("Histogram")
-        self.plot_canvas.draw()
-
-    def plot_pie(self, labels: list, sizes: list):
-        self.ax.clear()
-        self.ax.pie(sizes, labels=labels, autopct='%1.1f%%')
-        self.ax.set_title("Pie Chart")
         self.plot_canvas.draw()
 
     def customize_plot(self, options: dict):

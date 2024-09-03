@@ -7,14 +7,13 @@ from Services.profile_manager import ProfileManager
 from DbSetup.dao import IDataAccessObject
 from Services.error_handler import IErrorHandler
 from Services.computation_history import ComputationHistory
-from Services.data_exporter import DataExporter
+
 
 class MainController(IController):
     def __init__(self, authService: AuthenticationService, expressionEvaluator: ExpressionEvaluator,
                  graphPlotter: GraphPlotter, symbolicComputer: SymbolicComputer,
                  profileManager: ProfileManager, dataAccessObject: IDataAccessObject,
-                 errorHandler: IErrorHandler, computationHistory: ComputationHistory,
-                 dataExporter: DataExporter):
+                 errorHandler: IErrorHandler, computationHistory: ComputationHistory):
         self.authService = authService
         self.expressionEvaluator = expressionEvaluator
         self.graphPlotter = graphPlotter
@@ -23,7 +22,6 @@ class MainController(IController):
         self.dataAccessObject = dataAccessObject
         self.errorHandler = errorHandler
         self.computationHistory = computationHistory
-        self.dataExporter = dataExporter
 
     def authenticateUser(self, username: str, password: str) -> bool:
         return self.authService.authenticateUser(username, password)
@@ -39,10 +37,6 @@ class MainController(IController):
 
     def manageProfile(self, userId: int) -> any:
         return self.profileManager.getProfile(userId)
-
-    def exportResults(self, format: str) -> any:
-        # Use the dataExporter to export results
-        pass
 
     def getComputationHistory(self) -> list:
         return self.computationHistory.get_history()

@@ -40,6 +40,8 @@ class DashboardFrame(ttk.Frame):
         profile_label.pack(side=tk.RIGHT, padx=20)
 
     def create_recent_activities_section(self):
+        """creating the recent computation performed and binding them with double click to open that row"""
+
         activities_frame = ttk.LabelFrame(self, text="Recent Activities", padding=(20, 20))
         activities_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(10, 20))
 
@@ -52,12 +54,13 @@ class DashboardFrame(ttk.Frame):
         self.recent_activities_tree.column("Time", anchor="center", width=100)
         self.recent_activities_tree.pack(fill=tk.BOTH, expand=True)
 
-        # Bind double-click event to the treeview to show activity details
         self.recent_activities_tree.bind("<Double-1>", self.show_activity_details)
 
         self.load_recent_activities()
 
     def create_computation_statistics_section(self):
+        """creating the total number of computations performed by that user"""
+
         stats_frame = ttk.LabelFrame(self, text="Computation Statistics", padding="20", style='Stats.TFrame')
         stats_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 20))
 
@@ -69,6 +72,8 @@ class DashboardFrame(ttk.Frame):
             ttk.Label(stats_frame, text="No statistics available.", font=("Helvetica", 14)).pack(anchor="w", pady=2)
 
     def create_saved_computations_section(self):
+        """creating the saved computation performed and binding them with double click to open that row"""
+
         favorites_frame = ttk.LabelFrame(self, text="Saved & Favorite Computations", padding="20", style='Favorites.TFrame')
         favorites_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 20))
 
@@ -79,7 +84,6 @@ class DashboardFrame(ttk.Frame):
         self.saved_computations_tree.column("Result", anchor="center", width=300)
         self.saved_computations_tree.pack(fill=tk.BOTH, expand=True)
 
-        # Bind double-click event to the treeview to show computation details
         self.saved_computations_tree.bind("<Double-1>", self.show_computation_details)
 
         self.load_saved_computations()
@@ -89,10 +93,12 @@ class DashboardFrame(ttk.Frame):
         return profile_data["full_name"] if profile_data and profile_data.get("full_name") else "User"
 
     def get_profile_image(self):
-        # Fetch the image binary data from the database
+        """Fetching profile image data from the database
+        converting that data to image"""
+
         try:
             profile_data = self.controller.profile_manager.getProfile(self.user_id)
-            image_data = profile_data.get("profile_picture")  # Assuming the image is stored in the 'profile_picture' column
+            image_data = profile_data.get("profile_picture")
 
             if image_data:
                 # Convert the binary data to an image
@@ -124,10 +130,8 @@ class DashboardFrame(ttk.Frame):
 
 
     def load_recent_activities(self):
-        # Clear the existing items in the treeview
         self.recent_activities_tree.delete(*self.recent_activities_tree.get_children())
 
-        # Fetch the most recent activities
         recent_activities = self.get_recent_activities()
 
         for activity in recent_activities:
@@ -138,10 +142,8 @@ class DashboardFrame(ttk.Frame):
         self.saved_computations_tree.delete(*self.saved_computations_tree.get_children())
         saved_computations = self.get_saved_computations()
 
-        # Ensure computations are sorted by timestamp in descending order
         saved_computations.sort(key=lambda x: x['history_id'], reverse=True)
 
-        # Limit the display to the 5 most recent saved computations
         for computation in saved_computations[:5]:
             self.saved_computations_tree.insert("", tk.END, iid=computation['history_id'], values=(computation['equation'], computation['result']))
 
@@ -194,8 +196,6 @@ class DashboardFrame(ttk.Frame):
         steps_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         steps = details.get('steps', [])
-
-        # Debugging: Print the steps to ensure they are retrieved correctly
         print("Retrieved steps:", steps)
 
         if not steps:
@@ -204,18 +204,16 @@ class DashboardFrame(ttk.Frame):
             steps_text = ScrolledText(steps_frame, wrap=tk.WORD, font=("Helvetica", 12))
             steps_text.pack(fill="both", expand=True)
 
-            # If steps is a single string, split it into a list
+            #spliting the step into list if it is a single string
             if isinstance(steps, str):
                 steps = steps.splitlines()
 
-            # Debugging: Print the processed steps to see if they are correctly split
             print("Processed steps for display:", steps)
 
-            # Insert steps into the ScrolledText widget as multiline text
-            full_steps = "\n\n".join(steps)  # Assuming `steps` is a list of strings
+            full_steps = "\n\n".join(steps) 
             steps_text.insert(tk.END, full_steps)
 
-        steps_text.config(state=tk.DISABLED)  # M
+        steps_text.config(state=tk.DISABLED)   
 
     def refresh_dashboard(self):
         self.load_recent_activities()
@@ -225,24 +223,22 @@ class DashboardFrame(ttk.Frame):
         recent_activities = []
         for entry in self.dao.get_computation_history(self.user_id):
             recent_activities.append({
-                "history_id": entry[0],  # Assuming entry[0] is the unique identifier for the computation
-                "equation": entry[2],    # Assuming entry[2] is the equation/expression
+                "history_id": entry[0],  
+                "equation": entry[2],    
                 "result": entry[3], 
-                "timestamp": entry[4]            # Assuming entry[3] is the result of the computation
+                "timestamp": entry[4]            
             })
-        # Limit the list to the most recent 10 activities
         return recent_activities
 
 
     def get_computation_statistics(self):
-        # Fetch the computation history for the current user
+
         history = self.dao.get_computation_history(self.user_id)
         total_computations = len(history)
         statistics = {}
 
         if total_computations > 0:
-            # Determine the favorite function (most common result)
-            results = [entry[3] for entry in history]  # Assuming entry[3] is the result of the computation
+            results = [entry[3] for entry in history] 
             favorite_function = max(set(results), key=results.count)
 
             statistics["Total Computations"] = total_computations
@@ -257,9 +253,9 @@ class DashboardFrame(ttk.Frame):
         computations = []
         for entry in self.dao.get_computation_history(self.user_id):
             computations.append({
-                "history_id": entry[0],  # Assuming entry[0] is the unique identifier for the computation
-                "equation": entry[2],    # Assuming entry[2] is the equation/expression
-                "result": entry[3]       # Assuming entry[3] is the result of the computation
+                "history_id": entry[0],  
+                "equation": entry[2],    
+                "result": entry[3]     
             })
         return computations
 

@@ -145,7 +145,7 @@ class SymbolicComputer:
                         output.append(operators.pop())
                     if not operators or operators[-1].value != '(':
                         raise ValueError("Mismatched parentheses")
-                    operators.pop()  # Pop the '('
+                    operators.pop()  
             elif isinstance(token, Bracket):
                 if token.value == '[':
                     operators.append(token)
@@ -154,7 +154,7 @@ class SymbolicComputer:
                         output.append(operators.pop())
                     if not operators or operators[-1].value != '[':
                         raise ValueError("Mismatched brackets")
-                    operators.pop()  # Pop the '['
+                    operators.pop()  
 
         while operators:
             output.append(operators.pop())
@@ -191,12 +191,10 @@ class SymbolicComputer:
     def evaluate_expression(self, expression: str):
         self.clear_steps()
 
-        # Check if it's a simple expression without '='
         if '=' not in expression:
             try:
                 sympy_expr = sp.sympify(expression)
                 
-                # Attempt to factor the expression
                 simplified_expr = sp.factor(sympy_expr)
                 
                 self.add_step(f"Simplifying the expression: {expression}")
@@ -205,15 +203,12 @@ class SymbolicComputer:
             except Exception as e:
                 raise ValueError(f"Error evaluating expression: {e}")
 
-        # Split the expression into LHS and RHS based on the equals sign
         lhs_expression, rhs_expression = expression.split('=')
 
-        # Tokenize and process LHS
         lhs_tokens = self.tokenize(lhs_expression.strip())
         lhs_postfix_tokens = self.to_postfix(lhs_tokens)
         lhs_tree = self.build_tree_from_postfix(lhs_postfix_tokens)
 
-        # Tokenize and process RHS
         rhs_tokens = self.tokenize(rhs_expression.strip())
         rhs_postfix_tokens = self.to_postfix(rhs_tokens)
         rhs_tree = self.build_tree_from_postfix(rhs_postfix_tokens)
@@ -221,11 +216,9 @@ class SymbolicComputer:
         if not lhs_tree or not rhs_tree:
             raise ValueError("The tree was not correctly built.")
 
-        # Evaluate both sides
         lhs_result = self.evaluate_node(lhs_tree)
         rhs_result = self.evaluate_node(rhs_tree)
 
-        # Create a SymPy equation and solve it
         equation = sp.Eq(lhs_result, rhs_result)
         self.add_step(f"Solving the equation: {equation}")
         result = sp.solve(equation)
@@ -292,7 +285,6 @@ class SymbolicComputer:
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
 
-        # Replace '**' with '^' for more familiar notation
         expr_str = str(expr).replace('**', '^')
 
         self.add_step("Steps to Differentiate:")
@@ -323,7 +315,6 @@ class SymbolicComputer:
         sym = sp.Symbol(symbol)
         expr = sp.sympify(function)
 
-        # Replace '**' with '^' for more familiar notation
         expr_str = str(expr).replace('**', '^')
 
         self.add_step("Steps to Integrate:")
@@ -398,29 +389,23 @@ class SymbolicComputer:
         self.clear_steps()
         
         try:
-            # Create symbolic variables
             x = sp.Symbol('x')
             y = sp.Function(func)(x)
 
-            # Ensure the input equation is well-formed
             if not equation:
                 raise ValueError("The equation cannot be empty.")
 
-            # Split equation into LHS and RHS
             if '=' in equation:
                 lhs, rhs = equation.split('=')
             else:
-                lhs, rhs = equation, "0"  # Assume the equation is equal to zero if no equals sign
+                lhs, rhs = equation, "0"  
 
-            # Strip and sympify LHS and RHS
             lhs = lhs.strip()
             rhs = rhs.strip()
 
-            # Debugging: Show the parsed LHS and RHS
             print(f"Parsed LHS: {lhs}")
             print(f"Parsed RHS: {rhs}")
 
-            # Try to create the symbolic equation
             try:
                 eq = sp.Eq(sp.sympify(lhs), sp.sympify(rhs))
             except Exception as e:
@@ -454,27 +439,24 @@ class SymbolicComputer:
                         f"   - Therefore, the equation of the tangent line is y = {sp.pretty(tangent)}.\n")
             self.add_step(f"Final Result: The tangent line to the curve at {symbol} = {point} is y = {sp.pretty(tangent)}.\n")
             return tangent, self.get_steps()
+    
     def solve_linear_equation(self, equation: str):
         self.clear_steps()
 
         try:
-            # Split the equation into LHS and RHS
             if '=' in equation:
                 lhs, rhs = equation.split('=')
             else:
                 raise ValueError("The equation must have an equals sign.")
 
-            # Strip and convert to SymPy expression
             lhs = lhs.strip()
             rhs = rhs.strip()
 
-            # Convert LHS and RHS to sympy expressions
             lhs_expr = sp.sympify(lhs)
             rhs_expr = sp.sympify(rhs)
 
             self.add_step(f"Solving the linear equation: {lhs_expr} = {rhs_expr}")
 
-            # Solve the equation
             solution = sp.solve(lhs_expr - rhs_expr)
 
             self.add_step(f"Solution: {solution}")

@@ -18,7 +18,6 @@ class ProfileManagement(ttk.Frame):
 
         logging.debug(f"ProfileManagement initialized for user_id: {self.user_id}")
 
-        # Set up the main layout with two frames: one for profile management, one for user details
         self.left_frame = ttk.Frame(self, padding="5 5", style="LeftFrame.TFrame")
         self.right_frame = ttk.Frame(self, padding="5 5", style="RightFrame.TFrame")
         
@@ -38,25 +37,20 @@ class ProfileManagement(ttk.Frame):
         self.right_frame.grid_rowconfigure(0, weight=1)
         self.right_frame.grid_columnconfigure(0, weight=1)
 
-        # Initialize the interface components
         self.setup_left_frame()
         self.setup_right_frame()
 
-        # Load the profile data
         self.load_profile_data()
 
     def setup_left_frame(self):
-        # Profile Details Section
         ttk.Label(self.left_frame, text="Profile Details", font=("Helvetica", 16, "bold")).grid(row=0, column=0, columnspan=2, sticky="nw")
 
-        # Profile Picture and Upload Button
         self.profile_image_label = ttk.Label(self.left_frame)
         self.profile_image_label.grid(row=1, column=0, sticky="nw", padx=(0, 5), pady=(5, 5))
 
         upload_button = ttk.Button(self.left_frame, text="Upload Picture", command=self.upload_picture)
         upload_button.grid(row=1, column=1, sticky="nw", pady=(5, 5))
 
-        # Name Fields
         ttk.Label(self.left_frame, text="First Name").grid(row=2, column=0, sticky="w")
         self.first_name_entry = ttk.Entry(self.left_frame, width=25)
         self.first_name_entry.grid(row=2, column=1, sticky="w", padx=(5, 0))
@@ -65,7 +59,6 @@ class ProfileManagement(ttk.Frame):
         self.last_name_entry = ttk.Entry(self.left_frame, width=25)
         self.last_name_entry.grid(row=3, column=1, sticky="w", padx=(5, 0))
         
-        # Registration Date (Display only)
         ttk.Label(self.left_frame, text="Registration Date").grid(row=4, column=0, sticky="w")
         self.registration_date = ttk.Label(self.left_frame, text="")
         self.registration_date.grid(row=4, column=1, sticky="w", padx=(5, 0))
@@ -73,7 +66,6 @@ class ProfileManagement(ttk.Frame):
         save_button = ttk.Button(self.left_frame, text="Save Changes", command=self.save_profile)
         save_button.grid(row=5, column=1, sticky="w", pady=(5, 5))
 
-        # Password Management Section
         ttk.Label(self.left_frame, text="Change Password", font=("Helvetica", 16, "bold")).grid(row=6, column=0, columnspan=2, sticky="w", pady=(5, 5))
         
         ttk.Label(self.left_frame, text="Old Password").grid(row=7, column=0, sticky="w")
@@ -91,17 +83,14 @@ class ProfileManagement(ttk.Frame):
         change_password_button = ttk.Button(self.left_frame, text="Change Password", command=self.change_password)
         change_password_button.grid(row=10, column=1, sticky="w", pady=(5, 5))
 
-        # Delete Account Section
         ttk.Label(self.left_frame, text="Delete Account", font=("Helvetica", 16, "bold")).grid(row=11, column=0, columnspan=2, sticky="w", pady=(5, 5))
         
         delete_account_button = ttk.Button(self.left_frame, text="Delete Account", command=self.delete_account)
         delete_account_button.grid(row=12, column=1, sticky="w", pady=(5, 0))
 
     def setup_right_frame(self):
-        # Right-side Frame for User Details and History
         ttk.Label(self.right_frame, text="User Profile & History", font=("Helvetica", 16, "bold")).grid(row=0, column=0, sticky="nw", pady=(5, 5))
 
-        # User Details Section with Separation
         self.add_label_value(self.right_frame, "Username:", "username", row=1)
         self.add_label_value(self.right_frame, "Email:", "email", row=2)
         self.add_label_value(self.right_frame, "Full Name:", "full_name", row=3)
@@ -110,7 +99,6 @@ class ProfileManagement(ttk.Frame):
         self.add_label_value(self.right_frame, "Last Profile Update:", "profile_last_updated", row=6)
         self.add_label_value(self.right_frame, "Preferences:", "preferences", row=7)
 
-        # View History Button (Aligned to the right)
         view_history_button = ttk.Button(self.right_frame, text="View History", command=self.show_history_frame)
         view_history_button.grid(row=8, column=0, sticky="nw", pady=(5, 5), padx=(5, 5))
 
@@ -119,7 +107,7 @@ class ProfileManagement(ttk.Frame):
         ttk.Label(frame, text=label_text, font=("Helvetica", 12, "bold")).grid(row=row, column=0, sticky="w")
         self.details_label = ttk.Label(frame, text="", font=("Helvetica", 12))
         self.details_label.grid(row=row, column=1, sticky="w", padx=(5, 0))
-        setattr(self, f"{data_key}_label", self.details_label)  # Store reference to the label for later update
+        setattr(self, f"{data_key}_label", self.details_label) 
 
     def load_profile_data(self):
         """Load profile data from the database using ProfileManager."""
@@ -142,11 +130,10 @@ class ProfileManagement(ttk.Frame):
             if profile_data.get("profile_picture"):
                 profile_image_data = profile_data["profile_picture"]
                 image = Image.open(io.BytesIO(profile_image_data))
-                image = self._resize_and_crop_image(image, size=(120, 120))  # Adjust size for thumbnail
+                image = self._resize_and_crop_image(image, size=(120, 120)) 
                 self.profile_image = ImageTk.PhotoImage(image)
                 self.profile_image_label.configure(image=self.profile_image)
 
-            # Update the details labels with the correct data
             self.username_label.configure(text=profile_data.get("username", ""))
             self.email_label.configure(text=profile_data.get("email", ""))
             self.full_name_label.configure(text=profile_data.get("full_name", ""))
@@ -212,14 +199,15 @@ class ProfileManagement(ttk.Frame):
         new_password = self.new_password_entry.get()
         confirm_password = self.confirm_password_entry.get()
 
-        if new_password == confirm_password:
-            success = self.controller.auth_service.change_password(self.user_id, old_password, new_password)
-            if success:
-                messagebox.showinfo("Change Password", "Password changed successfully!")
-            else:
-                self.display_error_popup("Failed to change password. Please try again.")
-        else:
+        if new_password != confirm_password:
             self.display_error_popup("Passwords do not match. Please try again.")
+            return
+        
+        success = self.controller.auth_service.change_password(self.user_id, old_password, new_password)
+        if success:
+            messagebox.showinfo("Change Password", "Password changed successfully!")
+        else:
+            self.display_error_popup("Failed to change password. Please try again.")
 
     def delete_account(self):
         """Delete the user's account."""
@@ -241,7 +229,6 @@ class ProfileManagement(ttk.Frame):
         self.history_frame = tk.Toplevel(self)
         self.history_frame.title("Computation History")
 
-        # Search bar
         search_frame = ttk.Frame(self.history_frame)
         search_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
 
@@ -254,7 +241,6 @@ class ProfileManagement(ttk.Frame):
         search_button = ttk.Button(search_frame, text="Search", command=lambda: self.search_computation(search_entry.get()))
         search_button.pack(side=tk.LEFT, padx=(10, 0))
 
-        # Table for displaying computation history
         columns = ("ID", "Full Name", "Equation", "Result", "Date")
         self.history_table = ttk.Treeview(self.history_frame, columns=columns, show="headings")
         for col in columns:
@@ -265,11 +251,9 @@ class ProfileManagement(ttk.Frame):
 
         self.history_table.bind("<Double-1>", self.show_computation_details)
 
-        # Load more button
         load_more_button = ttk.Button(self.history_frame, text="Load More", command=self.load_more_history)
         load_more_button.pack(side=tk.BOTTOM, pady=10)
 
-        # Load initial history
         self.load_history()
 
     def load_history(self, offset=0, limit=15):
@@ -301,23 +285,19 @@ class ProfileManagement(ttk.Frame):
         item_values = self.history_table.item(selected_item, "values")
         computation_id = item_values[0]
 
-        # Fetch computation details
         try:
             details = self.controller.profile_manager.get_computation_details(computation_id)
         except Exception as e:
             self.display_error_popup(f"Failed to load computation details: {str(e)}")
             return
 
-        # Create a new window for computation details
         detail_frame = tk.Toplevel(self)
         detail_frame.title("Computation Details")
 
-        # Display the basic details (full name, equation, result)
         ttk.Label(detail_frame, text=f"Full Name: {details.get('full_name', '')}", font=("Helvetica", 14)).pack(anchor="w", padx=10, pady=5)
         ttk.Label(detail_frame, text=f"Equation: {details.get('expression', '')}", font=("Helvetica", 14)).pack(anchor="w", padx=10, pady=5)
         ttk.Label(detail_frame, text=f"Result: {details.get('result', '')}", font=("Helvetica", 14)).pack(anchor="w", padx=10, pady=5)
 
-        # Display the symbolic steps if available
         steps_frame = ttk.LabelFrame(detail_frame, text="Steps", padding=(10, 10))
         steps_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -325,28 +305,23 @@ class ProfileManagement(ttk.Frame):
         if not steps:
             ttk.Label(steps_frame, text="No steps available.", font=("Helvetica", 12)).pack(anchor="w")
         else:
-            # Use ScrolledText to display the steps
             steps_text = ScrolledText(steps_frame, wrap="word", font=("Helvetica", 12))
             steps_text.pack(fill="both", expand=True)
 
-            # Insert steps line by line
             steps_text.insert("1.0", steps)
 
-            steps_text.config(state="disabled")  # Make text read-only
+            steps_text.config(state="disabled") 
 
-        # Check if there is graph data and display it
         if 'graph_data' in details:
             graph_frame = ttk.LabelFrame(detail_frame, text="Graph", padding=(10, 10))
             graph_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-            # Decode the graph image from the byte data
             image_data = io.BytesIO(details['graph_data']['image'])
             img = Image.open(image_data)
             img_tk = ImageTk.PhotoImage(img)
 
-            # Display the graph image
             graph_label = ttk.Label(graph_frame, image=img_tk)
-            graph_label.image = img_tk  # Keep a reference to the image
+            graph_label.image = img_tk 
             graph_label.pack()
 
         # If there's numerical graph data (x, y values), display it using matplotlib

@@ -15,9 +15,9 @@ class ExpressionEvaluator:
         self.functions = {
             'abs': abs,
             'sqrt': math.sqrt,
-            'log': math.log,           # Natural logarithm (base e)
-            'log10': math.log10,       # Base 10 logarithm
-            'log2': math.log2,         # Base 2 logarithm
+            'log': math.log,          
+            'log10': math.log10,      
+            'log2': math.log2,        
             'sin': math.sin,
             'cos': math.cos,
             'tan': math.tan,
@@ -37,14 +37,13 @@ class ExpressionEvaluator:
             'InequalityExpression': InequalityExpression
         }
         self.solver = StepByStepSolver()
-        self.dao = dao  # Data Access Object for database operations
-        self.user_id = user_id  # Current user ID for saving history
-        self._history_saved = False  # Flag to track if history is saved
+        self.dao = dao  
+        self.user_id = user_id  
+        self._history_saved = False 
 
     def evaluate(self, expression: str):
-        # Reset the solver state for a new evaluation
         self._history_saved = False
-        self.solver.clear_steps()  # Reset the steps in the solver
+        self.solver.clear_steps()  
         self.solver.log_expression(expression)
         
         parser = self.Parser(expression, self)
@@ -53,7 +52,6 @@ class ExpressionEvaluator:
         result = self._evaluate_ast(ast)
         steps = self.solver.get_detailed_steps()
         
-        # Save the result and steps to the history for this specific evaluation
         self.save_to_history(expression, result, steps)
         
         ast_image = parser.draw_ast(ast)
@@ -65,7 +63,6 @@ class ExpressionEvaluator:
             raise ValueError("Attempted to evaluate a None node. Check the AST construction for issues.")
 
         if node.left is None and node.right is None:
-            # Handle constants, variables, and functions
             if isinstance(node.value, str):
                 if node.value in self.constants:
                     value = self.constants[node.value]
@@ -102,7 +99,6 @@ class ExpressionEvaluator:
         right_val = self._evaluate_ast(node.right) if node.right else None
 
         if node.value == '-' and node.left is None:
-            # Handle unary negation
             result = -right_val
             self.solver.log_operation('negate', None, right_val, result, node)
             return result
@@ -137,7 +133,6 @@ class ExpressionEvaluator:
                     params_list = self._parse_inequality_expression_parameters(params)
                     obj = self.object_classes[class_name](*params_list)
                 elif class_name == 'ComplexNumber':
-                    # Properly parsing ComplexNumber parameters
                     real_part, imag_part = self._parse_complex_parameters(params)
                     obj = self.object_classes[class_name](real_part, imag_part)
                 else:
@@ -155,12 +150,10 @@ class ExpressionEvaluator:
 
     def _parse_complex_parameters(self, params):
         try:
-            # Remove any surrounding whitespace and split the string by comma
             param_list = params.split(',')
             if len(param_list) != 2:
                 raise ValueError(f"ComplexNumber requires exactly 2 parameters, got {len(param_list)}")
 
-            # Convert the split strings into floats
             real_part = float(param_list[0].strip())
             imag_part = float(param_list[1].strip())
             return real_part, imag_part
@@ -231,7 +224,6 @@ class ExpressionEvaluator:
 
             result = None
             if isinstance(left_val, Polynomial) or isinstance(right_val, Polynomial):
-                # Polynomial operations
                 if operator == '+':
                     result = left_val + right_val
                 elif operator == '-':
@@ -251,7 +243,6 @@ class ExpressionEvaluator:
                 self.solver.log_steps_for_expression("Polynomial", details)
                 return result
             elif isinstance(left_val, ComplexNumber) or isinstance(right_val, ComplexNumber):
-                # Complex number operations
                 if operator == '+':
                     result = left_val + right_val
                 elif operator == '-':
@@ -272,7 +263,6 @@ class ExpressionEvaluator:
                 self.solver.log_steps_for_expression("ComplexNumber", details)
                 return result
             elif isinstance(left_val, Matrix) or isinstance(right_val, Matrix):
-                # Matrix operations
                 if operator == '+':
                     result = left_val + right_val
                 elif operator == '-':
@@ -284,15 +274,14 @@ class ExpressionEvaluator:
                 self.solver.log_operation(operator, left_val, right_val, result, node)
                 return result
             elif isinstance(left_val, Vector) or isinstance(right_val, Vector):
-                # Vector operations
                 if operator == '+':
                     result = left_val + right_val
                 elif operator == '-':
                     result = left_val - right_val
                 elif operator == '.':
-                    result = left_val.dot(right_val)  # Dot product
+                    result = left_val.dot(right_val)
                 elif operator == 'x':
-                    result = left_val.cross(right_val)  # Cross product
+                    result = left_val.cross(right_val)
                 else:
                     raise ValueError(f"Unsupported vector operator: {operator}")
                 self.solver.log_operation(operator, left_val, right_val, result, node)
@@ -330,7 +319,6 @@ class ExpressionEvaluator:
             elif operator == 'sqrt':
                 result = math.sqrt(right_val)
             elif operator == 'log':
-                # For custom base log (right_val as base)
                 result = math.log(left_val, right_val)
             elif operator == 'abs':
                 result = abs(right_val)
@@ -413,15 +401,14 @@ class ExpressionEvaluator:
                     output.append(node)
                     self.graph.add_node(id(node), label=token)
                 elif token in self.evaluator.functions:
-                    operators.append(token)  # Push the function onto the operators stack
+                    operators.append(token) 
                 elif token == '(':
                     operators.append(token)
                 elif token == ')':
                     while operators and operators[-1] != '(':
                         apply_operator()
-                    operators.pop()  # Pop the '('
+                    operators.pop() 
                     if operators and operators[-1] in self.evaluator.functions:
-                        # If the top of the stack is a function, treat it as such
                         func = operators.pop()
                         arg = output.pop()
                         func_node = ExpressionEvaluator.ASTNode(func, None, arg)
@@ -429,7 +416,7 @@ class ExpressionEvaluator:
                         self.graph.add_node(id(func_node), label=func)
                         self.graph.add_edge(id(func_node), id(arg))
                         self.evaluator.solver.log_ast_construction(func_node)
-                elif token.isdigit() or (token.startswith('-') and token[1:].isdigit()):  # Handle negative numbers
+                elif token.isdigit() or (token.startswith('-') and token[1:].isdigit()):
                     node = ExpressionEvaluator.ASTNode(token)
                     output.append(node)
                     self.graph.add_node(id(node), label=token)
@@ -459,13 +446,10 @@ class ExpressionEvaluator:
                     positions = {}
 
                 if node is not None:
-                    # Assign the position for the current node
                     positions[id(node)] = (x, y)
 
-                    # Increase the vertical distance between nodes to avoid overlap
-                    vertical_offset = 1.5  # Adjust this value to reduce overlap
+                    vertical_offset = 1.5 
 
-                    # Calculate positions for the left and right children
                     if node.left:
                         set_positions(node.left, x - width_scale / (2 ** (level + 1)), y - vertical_offset, positions, level + 1, width_scale)
                     if node.right:
@@ -473,32 +457,26 @@ class ExpressionEvaluator:
 
                 return positions
 
-            # Generate positions for each node in the AST
             positions = set_positions(ast_node, width_scale=10)
 
-            # Ensure every node in the graph has a position
             for node_id in self.graph.nodes:
                 if node_id not in positions:
-                    positions[node_id] = (0, 0)  # Assign a default position
+                    positions[node_id] = (0, 0)  
 
-            # Adjust node labels for readability
             labels = nx.get_node_attributes(self.graph, 'label')
 
-            # Initialize the plot with a larger figure size for clarity
             plt.figure(figsize=(14, 10))
 
-            # Estimate the appropriate node size based on label length
             node_sizes = []
             for node_id, label in labels.items():
-                estimated_length = len(label) * 1000  # Adjust multiplier as needed for better fitting
+                estimated_length = len(label) * 1000 
                 node_sizes.append(estimated_length)
 
-            # Draw the graph with manually set positions and calculated node sizes
             nx.draw(self.graph, pos=positions, labels=labels, with_labels=True,
                     arrows=False, node_size=node_sizes, node_color="lightblue", font_size=10, font_weight="bold")
 
             plt.title("Abstract Syntax Tree")
-            plt.axis('off')  # Turn off the axis for a cleaner look
+            plt.axis('off') 
             buf = BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
@@ -669,7 +647,6 @@ class StepByStepSolver:
     def get_detailed_steps(self):
         return "\n".join(self.steps) + "\n" + "\n".join(self.ast_construction_logs)
 
-
 # Polynomial class with operations and root finding
 class Polynomial:
     def __init__(self, coefficients):
@@ -741,7 +718,6 @@ class Polynomial:
                 return complex(-b / (2 * a), math.sqrt(-discriminant) / (2 * a)),
         return "Higher degree roots can be found using numerical methods or by factoring."
 
-
 # ComplexNumber class with basic arithmetic and root finding
 class ComplexNumber:
     def __init__(self, real, imag):
@@ -778,7 +754,6 @@ class ComplexNumber:
             imag_part = root_magnitude * math.sin((angle + 2 * math.pi * k) / n)
             roots.append(ComplexNumber(real_part, imag_part))
         return roots
-
 
 # Matrix class with arithmetic and determinant operations
 class Matrix:
@@ -826,7 +801,6 @@ class Matrix:
 
     def __str__(self):
         return f"Matrix({self.matrix})"
-
 
 # Vector class with basic operations
 class Vector:

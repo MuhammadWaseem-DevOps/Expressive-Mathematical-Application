@@ -18,8 +18,9 @@ from Services.computation_history import ComputationHistory
 from DbSetup.dao import SQLiteDataAccessObject
 from Gui.dashboardframe import DashboardFrame
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 class TkinterGUI(ThemedTk):
     def __init__(self, auth_service=None, expression_evaluator=None,
                  symbolic_computer=None, profile_manager=None, error_handler=None,
@@ -31,12 +32,12 @@ class TkinterGUI(ThemedTk):
 
         self.dao = dao or SQLiteDataAccessObject(db_name=db_path)
         self.auth_service = auth_service or AuthenticationService(db_path)
-        self.evaluator = None  # Initialize later after login
+        self.evaluator = None
         self.symbolic_computer = symbolic_computer or SymbolicComputation(self.dao)
         self.profile_manager = profile_manager or ProfileManagement(self.dao)
         self.error_handler = error_handler or ErrorHandler(self.dao)
-        self.computation_history = None  # Initialize later after login
-        self.data_exporter = data_exporter or DataExporter(self.dao)
+        self.computation_history = None 
+        self.data_exporter = data_exporter
         self.db_path = db_path
 
         self.bg_color = "#f4f4f4"
@@ -81,18 +82,18 @@ class TkinterGUI(ThemedTk):
         self.evaluator = ExpressionEvaluator(dao=self.dao, user_id=user_id)
         self.computation_history = ComputationHistory(dao=self.dao, user_id=user_id)
 
-        self.init_authenticated_frames()  # Initialize the frames that need the user to be logged in
+        self.init_authenticated_frames() 
         self.init_sidebar()
         self.showDashboard()
 
     def toggle_sidebar(self):
         """Toggle the visibility of the sidebar."""
         if self.sidebar_visible:
-            self.sidebar.grid_remove()  # Hide the sidebar
+            self.sidebar.grid_remove()
         else:
-            self.sidebar.grid(row=0, column=0, sticky="ns", padx=(20, 0), pady=20)  # Show the sidebar
+            self.sidebar.grid(row=0, column=0, sticky="ns", padx=(20, 0), pady=20)
 
-        self.sidebar_visible = not self.sidebar_visible  # Toggle the visibility state
+        self.sidebar_visible = not self.sidebar_visible 
 
     def init_login_frames(self):
         """Initialize frames that do not require the user to be logged in."""
@@ -130,12 +131,12 @@ class TkinterGUI(ThemedTk):
     def init_sidebar(self):
         """Initialize the sidebar with buttons and icons."""
         sidebar_buttons = [
-            {"text": "Dashboard", "icon": "icons/dashboard.png", "command": self.showDashboard},
-            {"text": "Expression Input", "icon": "icons/input.png", "command": self.showExpressionInput},
-            {"text": "Graph Plotter", "icon": "icons/graph.png", "command": self.showGraphPlotter},
-            {"text": "Symbolic Computation", "icon": "icons/symbolic.png", "command": self.showSymbolicComputation},
-            {"text": "Profile Management", "icon": "icons/profile.png", "command": self.showProfileManagement},
-            {"text": "Logout", "icon": "icons/logout.png", "command": self.logout}
+            {"text": "Dashboard", "icon": "Gui/assets/dashboard.png", "command": self.showDashboard},
+            {"text": "Expression Input", "icon": "Gui/assets/input.png", "command": self.showExpressionInput},
+            {"text": "Graph Plotter", "icon": "Gui/assets/graph.png", "command": self.showGraphPlotter},
+            {"text": "Symbolic Computation", "icon": "Gui/assets/symbolic.png", "command": self.showSymbolicComputation},
+            {"text": "Profile Management", "icon": "Gui/assets/profile.png", "command": self.showProfileManagement},
+            {"text": "Logout", "icon": "Gui/assets/logout.png", "command": self.logout}
         ]
 
         row = 0
@@ -145,7 +146,7 @@ class TkinterGUI(ThemedTk):
                 icon = Image.open(icon_path)
                 icon = ImageTk.PhotoImage(icon)
                 button = ttk.Button(self.sidebar, text=button_info["text"], image=icon, compound=tk.LEFT, command=button_info["command"], style='Sidebar.TButton')
-                button.image = icon  # Keep a reference to avoid garbage collection
+                button.image = icon  
             else:
                 button = ttk.Button(self.sidebar, text=button_info["text"], command=button_info["command"], style='Sidebar.TButton')
                 logging.warning(f"Icon not found: {icon_path}. Button created without icon.")
@@ -175,10 +176,10 @@ class TkinterGUI(ThemedTk):
         if not self.ensure_authenticated():
             return
         logging.debug("Showing main dashboard")
-        self.sidebar.grid(row=0, column=0, sticky="ns")  # Show the sidebar only after login
-        self.toggle_button.grid()  # Show the toggle button after login
+        self.sidebar.grid(row=0, column=0, sticky="ns") 
+        self.toggle_button.grid()  
         self.showFrame("Dashboard")
-        self.init_sidebar()  # Initialize sidebar only when the user is logged in
+        self.init_sidebar()  
 
     def showExpressionInput(self):
         """Display the expression input frame."""
@@ -215,7 +216,6 @@ class TkinterGUI(ThemedTk):
         return True
 
     def login(self, username=None, password=None):
-        # Fetch username and password from the entry fields if not provided
         if username is None or password is None:
             login_frame = self.frames.get("Login Interface")
             if login_frame:
@@ -224,7 +224,7 @@ class TkinterGUI(ThemedTk):
 
         logging.debug("Attempting login")
         if self.auth_service.authenticate_user(username, password):
-            self.initialize_after_login()  # Initialize components after login
+            self.initialize_after_login() 
             self.frames["Login Interface"].login_button.configure(text="Logout", command=self.logout)
         else:
             self.display_error_popup("Invalid username or password. Please try again.")
@@ -245,16 +245,14 @@ class TkinterGUI(ThemedTk):
         """Handle the logout process."""
         logging.debug("Logging out")
         self.auth_service.logout()
-        self.sidebar.grid_remove()  # Hide the sidebar on logout
-        self.toggle_button.grid_remove()  # Hide the toggle button on logout
+        self.sidebar.grid_remove()
+        self.toggle_button.grid_remove()
         
-        # Ensure the login button is reset correctly
         login_frame = self.frames.get("Login Interface")
         if login_frame:
             login_frame.login_button.configure(text="Login", command=self.login)
         
         self.showLoginScreen()
-
 
     def displayResult(self, result):
         """Display a success result message."""

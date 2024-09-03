@@ -12,7 +12,6 @@ from Services.symbolic_computer import SymbolicComputer
 from Services.profile_manager import ProfileManager
 from Services.error_handler import ErrorHandler
 from Services.computation_history import ComputationHistory
-from Services.data_exporter import DataExporter
 from Gui.userview import TkinterGUI
 from DbSetup.dao import SQLiteDataAccessObject
 import tkinter as tk
@@ -26,14 +25,12 @@ if __name__ == "__main__":
     symbolic_computer = SymbolicComputer()
     profile_manager = ProfileManager(db=dao)
     error_handler = ErrorHandler()
-    data_exporter = DataExporter()
 
     app = TkinterGUI(
         auth_service=auth_service,
         symbolic_computer=symbolic_computer,
         profile_manager=profile_manager,
         error_handler=error_handler,
-        data_exporter=data_exporter,
         db_path=db_path,
         dao=dao
     )

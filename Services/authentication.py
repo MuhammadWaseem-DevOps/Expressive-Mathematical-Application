@@ -9,7 +9,7 @@ class AuthenticationService:
     def __init__(self, db):
         self.dao = SQLiteDataAccessObject(db_name=db)
         self.profile_manager = ProfileManager(self.dao)
-        self.current_user_id = None # Track the logged-in user's ID
+        self.current_user_id = None 
 
     def hash_password(self, password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
@@ -51,7 +51,7 @@ class AuthenticationService:
         }
         user_id = self.dao.insert('USER', new_user)
         if user_id:
-            self.current_user_id = user_id  # Set the current user ID upon successful registration
+            self.current_user_id = user_id 
             messagebox.showinfo("Success", "User created successfully.")
             return True
         else:
@@ -66,44 +66,52 @@ class AuthenticationService:
             messagebox.showerror("Authentication Failed", "Invalid username or password.")
             return False
         else:
-            self.current_user_id = result[0][0]  # Set the current user ID upon successful login
+            self.current_user_id = result[0][0] 
             logging.debug(f"User ID set to {self.current_user_id}")
             
-            # Ensure the ProfileManager instance is accessible
             profile_manager = self.profile_manager
             
-            # Check if the profile exists and create it if it doesn't
-            profile_data = profile_manager.getProfile(self.current_user_id)  # Pass the current user ID
+            profile_data = profile_manager.getProfile(self.current_user_id) 
             
             if not profile_data:
-                # Create the profile if it doesn't exist
                 user_data = {
                     'user_id': self.current_user_id,
-                    'first_name': result[0][4],  # Assuming first_name is in the 5th column
-                    'last_name': result[0][5]    # Assuming last_name is in the 6th column
+                    'first_name': result[0][4],
+                    'last_name': result[0][5]   
                 }
                 profile_manager.createProfile(user_data)
             
             messagebox.showinfo("Login Success", "Welcome back!")
             return True
 
-
     def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
         """Change the user's password."""
+        logging.info(f"Attempting to change password for user_id: {user_id}")
         old_password_hash = self.hash_password(old_password)
         new_password_hash = self.hash_password(new_password)
         
-        # Check if the old password is correct
+        logging.debug(f"Old password hash: {old_password_hash}")
+        logging.debug(f"New password hash: {new_password_hash}")
+        
+        # Verify the old password
         result = self.dao.select("USER", f"user_id = {user_id} AND password_hash = '{old_password_hash}'")
         if not result:
+            logging.error(f"Password change failed: incorrect old password for user_id {user_id}")
             messagebox.showerror("Error", "Old password is incorrect.")
             return False
         
-        # Update the password in the database
         update_data = {"password_hash": new_password_hash}
-        success = self.dao.update("USER", user_id, update_data)
-        return success
-
+        try:
+            success = self.dao.update("USER", user_id, update_data, id_column="user_id")
+            if success:
+                logging.info(f"Password successfully changed for user_id: {user_id}")
+            else:
+                logging.error(f"Password change failed during update for user_id {user_id}")
+            return success
+        except Exception as e:
+            logging.exception(f"Exception occurred while changing password for user_id {user_id}: {e}")
+            return False
+        
     def logout(self):
         """Clear the current user ID on logout."""
         self.current_user_id = None
